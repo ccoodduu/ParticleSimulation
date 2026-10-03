@@ -12,7 +12,7 @@ class ParticleContainer3D
 
     public ParticleParameters parameters;
 
-
+    private float LennardJonesCutoff2 => LennardJonesPotential.GetCutoffDistance2(parameters.Sigma, 3);
     public ParticleContainer3D(int numParticles, Vector3 worldSize, ParticleParameters parameters)
     {
         random = new Random();
@@ -63,12 +63,13 @@ class ParticleContainer3D
 
     public float GetTotalPotentialEnergy()
     {
+        float cutoff2 = LennardJonesCutoff2;
         float totalPotentialEnergy = 0f;
         for (int i = 0; i < particles.Length; i++)
         {
             for (int j = i + 1; j < particles.Length; j++)
             {
-                totalPotentialEnergy += LennardJonesPotential.CalculatePotentialEnergy(particles[i].Position, particles[j].Position, parameters.Sigma, parameters.Epsilon);
+                totalPotentialEnergy += LennardJonesPotential.CalculatePotentialEnergyWithCutoff(particles[i].Position, particles[j].Position, parameters.Sigma, parameters.Epsilon, cutoff2);
             }
         }
         return totalPotentialEnergy;
@@ -76,11 +77,18 @@ class ParticleContainer3D
 
     public void Update()
     {
+        float cutoff2 = LennardJonesCutoff2;
+
         // Loop igennem alle par af partikler og beregn kraften mellem dem
         for (int i = 0; i < particles.Length; i++)
         {
             for (int j = i + 1; j < particles.Length; j++)
             {
+                if (Vector3.DistanceSquared(particles[i].Position, particles[j].Position) > cutoff2)
+                {
+                    continue; // Spring over hvis partiklerne er langt fra hinanden, da det giver en kraft der nærmest er 0
+                }
+
                 var force = LennardJonesPotential.CalculateForce(particles[i].Position, particles[j].Position, parameters.Sigma, parameters.Epsilon);
                 particles[i].ApplyForce(force, parameters.Mass);
                 particles[j].ApplyForce(-force, parameters.Mass);

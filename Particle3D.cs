@@ -80,6 +80,11 @@ static class LennardJonesPotential
     public static float CalculatePotentialEnergy(Vector3 p1, Vector3 p2, float sigma2, float epsilon)
     {
         float distance2 = Vector3.DistanceSquared(p1, p2); // Beregn afstanden i anden mellem de to partikler (r^2). Afstanden kaldes ofte r i formlen for Lennard-Jones potentialet. 
+
+        return CalculatePotentialEnergy(distance2, sigma2, epsilon);
+    }
+    public static float CalculatePotentialEnergy(float distance2, float sigma2, float epsilon)
+    {
         float sigmaOverR2 = sigma2 / distance2;
 
         float sigmaOverR6 = sigmaOverR2 * sigmaOverR2 * sigmaOverR2;
@@ -88,5 +93,32 @@ static class LennardJonesPotential
         float potentialEnergy = 4 * epsilon * (sigmaOverR12 - sigmaOverR6);
 
         return potentialEnergy;
+    }
+
+    public static float CalculatePotentialEnergyWithCutoff(Vector3 p1, Vector3 p2, float sigma2, float epsilon, float cutoff2)
+    {
+        float offset = CalculatePotentialEnergy(cutoff2, sigma2, epsilon);
+        return CalculatePotentialEnergyWithCutoff(p1, p2, sigma2, epsilon, cutoff2, offset);
+    }
+    public static float CalculatePotentialEnergyWithCutoff(Vector3 p1, Vector3 p2, float sigma2, float epsilon, float cutoff2, float offset)
+    {
+        float distance2 = Vector3.DistanceSquared(p1, p2); // Beregn afstanden i anden mellem de to partikler (r^2). Afstanden kaldes ofte r i formlen for Lennard-Jones potentialet.
+
+        if (distance2 > cutoff2) return 0f;
+
+        float sigmaOverR2 = sigma2 / distance2;
+
+        float sigmaOverR6 = sigmaOverR2 * sigmaOverR2 * sigmaOverR2;
+        float sigmaOverR12 = sigmaOverR6 * sigmaOverR6;
+
+        float potentialEnergy = 4 * epsilon * (sigmaOverR12 - sigmaOverR6);
+
+        return potentialEnergy - offset;
+    }
+
+    public static float GetCutoffDistance2(float sigma, float scalar)
+    {
+        float s = sigma * scalar;
+        return s * s;
     }
 }
