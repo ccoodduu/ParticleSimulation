@@ -55,12 +55,15 @@ void Draw()
     float totalEnergy = kineticEnergy + potentialEnergy;
     float temperatureK = particleContainer.GetTemperature(kineticEnergy);
     float temperatureC = temperatureK - 273.15f;
+    float pressure = particleContainer.GetPressure(); // Enheden er u / (Å * ps^2)
+    float pressureKPa = pressure * 1.660540200e7f / 1000f;
 
     Raylib.DrawText("Total Kinetic Energy: " + kineticEnergy.ToString("F2"), 10, 30, 20, Color.White);
     Raylib.DrawText("Total Potential Energy: " + potentialEnergy.ToString("F2"), 10, 60, 20, Color.White);
     Raylib.DrawText("Total Energy: " + totalEnergy.ToString("F2"), 10, 90, 20, Color.White);
     Raylib.DrawText("Temperature: " + temperatureK.ToString("F2") + " K (" + temperatureC.ToString("F2") + " °C)", 10, 120, 20, Color.White);
     Raylib.DrawText("Simulation Time: " + (totalStepCount * Globals.SimulationStepTimePs).ToString("F0") + " ps", 10, 150, 20, Color.White);
+    Raylib.DrawText("Pressure: " + pressureKPa.ToString("F0") + " kPa", 10, 180, 20, Color.White);
 
     renderer.cameraDistance *= MathF.Pow(0.95f, Raylib.GetMouseWheelMove());
 

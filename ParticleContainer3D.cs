@@ -7,7 +7,9 @@ class ParticleContainer3D
     private readonly Particle3D[] particles;
     public IReadOnlyList<Particle3D> Particles => particles;
 
-    public Vector3 BoxSize { get; private set; }
+    public readonly Vector3 BoxSize;
+    public readonly float BoxSurfaceArea;
+    public readonly float BoxVolume;
     public readonly Random random;
 
     public ParticleParameters parameters;
@@ -20,6 +22,8 @@ class ParticleContainer3D
 
     private readonly Vector3 cellSize; // Størrelsen af hver celle i gitteret
 
+    private readonly Queue<float> presurreMeasurements = new Queue<float>();
+
     private float LennardJonesCutoff2 => LennardJonesPotential.GetCutoffDistance2(parameters.Sigma, 3);
     private float LennardJonesCutoff => LennardJonesPotential.GetCutoffDistance(parameters.Sigma, 3);
     public ParticleContainer3D(int numParticles, Vector3 worldSize, ParticleParameters parameters)
@@ -27,6 +31,9 @@ class ParticleContainer3D
         random = new Random();
 
         BoxSize = worldSize;
+        BoxSurfaceArea = (BoxSize.X * BoxSize.Y + BoxSize.Y * BoxSize.Z + BoxSize.Z * BoxSize.X) * 2;
+        BoxVolume = BoxSize.X * BoxSize.Y * BoxSize.Z;
+
         this.parameters = parameters;
 
         particles = new Particle3D[numParticles];
@@ -114,10 +121,15 @@ class ParticleContainer3D
     }
     public float GetTemperature(float totalKineticEnergy)
     {
-        float temperature = 1.5f * (totalKineticEnergy / particles.Length) * 0.8314456946f;
+        float temperature = (2f / 3f) * (totalKineticEnergy / particles.Length) /    0.8314456946f;
         return temperature;
     }
 
+    public float GetPressure()
+    {
+        if (presurreMeasurements.Count == 0) return 0f;
+        return presurreMeasurements.Average();
+    }
     // Udfører funktionen `action` på hvert par af partikler, der er indenfor LennardJonesCutoff i gitteret.
     // Dette bruges til at beregne kræfter og potentielle energier mellem partiklerne.
     private void ForEachNeighborPair(Action<int, int, float> action)
@@ -180,10 +192,15 @@ class ParticleContainer3D
             gridHead[gridIndex] = -1; // Reset cellen, dette resetter alle celler med partikler i, alle andre er allerede sat til -1, så det er ikke nødvendigt at sætte dem igen
         }
 
+        float totalVelocityChange = 0f;
+
         for (int i = 0; i < particles.Length; i++)
         {
             particles[i].ApplyHalfAcceleration(parameters.Mass); // Velocity verlet integration
-            particles[i].Update(BoxSize); // Flytter partiklerne og håndterer kollisioner med væggene
+
+            float velocityChange = particles[i].Update(BoxSize); // Flytter partiklerne og håndterer kollisioner med væggene
+            totalVelocityChange += velocityChange;
+
             particles[i].ResetAcceleration(); // Nulstil acceleration efter opdatering, så den ikke akkumuleres over tid
 
             int gridIndex = GetGridIndex(particles[i].Position); // Find cellen som partikel i befinder sig i efter opdateringen
@@ -191,6 +208,10 @@ class ParticleContainer3D
             gridHead[gridIndex] = i; // Sæt partikel i som den nye første partikel i cellen
             gridNext[i] = currentHead; // Sæt partiklen til at pege på den tidligere første partikel i cellen
         }
+
+        float pressure = totalVelocityChange * parameters.Mass / BoxSurfaceArea / Globals.SimulationStepTimePs; // Enheden er u*(Å/ps^2), hvilket er en enhed for tryk.
+        presurreMeasurements.Enqueue(pressure);
+        if (presurreMeasurements.Count > 10000) presurreMeasurements.Dequeue();
 
         // Loop igennem alle par af partikler og beregn kraften mellem dem
         ForEachNeighborPair((i, j, d2) =>
