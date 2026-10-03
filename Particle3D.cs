@@ -9,12 +9,12 @@ struct Particle3D(Vector3 position, Vector3 velocity)
 
     public void ApplyForce(Vector3 force, float mass)
     {
-        Velocity += force / mass * Globals.TickTime;
+        Velocity += force / mass * Globals.SimulationStepTimePs;
     }
 
     public void Update(Vector3 boxSize, float radius)
     {
-        Position += Velocity * Globals.TickTime;
+        Position += Velocity * Globals.SimulationStepTimePs;
 
         HandleBoundaryCollision(boxSize, radius);
     }

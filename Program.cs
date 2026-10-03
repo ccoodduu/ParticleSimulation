@@ -6,26 +6,28 @@ Raylib.SetConfigFlags(ConfigFlags.ResizableWindow);
 Raylib.InitWindow(Globals.ScreenWidth, Globals.ScreenHeight, "Particle Simulation");
 Raylib.SetTargetFPS(Globals.Fps);
 
-var particleContainer = new ParticleContainer3D(1000, new Vector3(100, 100, 100), ParticleParameters.Argon);
+var particleContainer = new ParticleContainer3D(1000, new Vector3(1000, 1000, 1000), ParticleParameters.Argon);
 var renderer = new Renderer3D(particleContainer);
 
-const int maxTicksPerFrame = 20;
+const int maxStepsPerFrame = Globals.Sps / Globals.Fps * 2;
 
-float unusedSimulationTime = 0;
+int totalStepCount = 0;
+float unusedTime = 0;
 while (!Raylib.WindowShouldClose())
 {
     float dt = Raylib.GetFrameTime();
-    unusedSimulationTime += dt;
+    unusedTime += dt;
 
     int ticks = 0;
-    while (unusedSimulationTime >= Globals.TickTime && ticks < maxTicksPerFrame)
+    while (unusedTime >= Globals.RealStepTime && ticks < maxStepsPerFrame)
     {
-        unusedSimulationTime -= Globals.TickTime;
+        unusedTime -= Globals.RealStepTime;
         Update();
+        totalStepCount++;
         ticks++;
     }
 
-    if (ticks >= maxTicksPerFrame) unusedSimulationTime = 0;
+    if (ticks >= maxStepsPerFrame) unusedTime = 0;
 
     Raylib.BeginDrawing();
 
@@ -52,6 +54,11 @@ void Draw()
     Raylib.DrawText("Total Potential Energy: " + particleContainer.GetTotalPotentialEnergy().ToString("F2"), 10, 60, 20, Color.White);
     Raylib.DrawText("Total Energy: " + (particleContainer.GetTotalKineticEnergy() + particleContainer.GetTotalPotentialEnergy()).ToString("F2"), 10, 90, 20, Color.White);
 
+    var temperatureK = particleContainer.GetTemperature();
+    var temperatureC = temperatureK - 273.15f;
+    Raylib.DrawText("Temperature: " + temperatureK.ToString("F2") + " K (" + temperatureC.ToString("F2") + " °C)", 10, 120, 20, Color.White);
+    Raylib.DrawText("Simulation Time: " + (totalStepCount * Globals.SimulationStepTimePs).ToString("F0") + " ps", 10, 150, 20, Color.White);
+
     renderer.cameraDistance *= MathF.Pow(0.95f, Raylib.GetMouseWheelMove());
 
     if (Raylib.IsMouseButtonDown(MouseButton.Left))
@@ -75,9 +82,13 @@ namespace ParticleSimulation
         public const int ScreenHeight = 720;
 
         public const int Fps = 60;
-        public const int Tps = 500;
+        public const int Sps = 1000;
 
-        public const float FrameTime = 1f / Fps;
-        public const float TickTime = 1f / Tps;
+        public const float RealFrameTime = 1f / Fps;
+        public const float RealStepTime = 1f / Sps;
+
+        public const float SimulationStepTimePs = 0.005f;
+        public const float PsPerSecond = 1_000_000_000_000f;
+        public const float SimulationStepTimeSeconds = SimulationStepTimePs / PsPerSecond;
     }
 }

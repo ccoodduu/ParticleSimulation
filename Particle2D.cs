@@ -23,7 +23,7 @@ class Particle2D
 
     public void Update()
     {
-        position += velocity * Globals.TickTime;
+        position += velocity * Globals.SimulationStepTimePs;
 
         if (position.X < radius)
         {
