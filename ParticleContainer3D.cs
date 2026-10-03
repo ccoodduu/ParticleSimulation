@@ -32,7 +32,7 @@ class ParticleContainer3D
         for (int i = 0; i < numParticles; i++)
         {
             var pos = new Vector3(radius) + new Vector3(x, y, z) * stepDistance;
-            var velocity = random.NextUnitVector3() * 10;
+            var velocity = random.NextUnitVector3() * 3.5f;
             particles[i] = new Particle3D(pos, velocity);
 
             x++;
@@ -75,6 +75,13 @@ class ParticleContainer3D
         return totalPotentialEnergy;
     }
 
+    public float GetTemperature()
+    {
+        float totalKineticEnergy = GetTotalKineticEnergy();
+        float temperature = 1.5f * (totalKineticEnergy / particles.Length) * 0.8314456946f;
+        return temperature;
+    }
+
     public void Update()
     {
         float cutoff2 = LennardJonesCutoff2;
@@ -107,7 +114,7 @@ public struct ParticleParameters
     public float Radius; // Kun visuelt. Partiklens radius i angstoms (Å)
     public float Mass; // Partiklens masse i units (u)
     public float Sigma; // Partiklens sigma i angstoms (Å)
-    public float Epsilon; // Partiklens epsilon i enheder af energi (u*Å^2*ps^2)
+    public float Epsilon; // Partiklens epsilon i enheder af energi (u*Å^2/ps^2)
 
     public ParticleParameters()
     {
