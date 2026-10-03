@@ -1,0 +1,34 @@
+root = true
+
+[*]
+spelling_languages = da-dk,en-us
+spelling_checkable_types = strings,identifiers,comments
+spelling_error_severity = information
+
+[*.cs]
+indent_style = space
+indent_size = 4
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Unused code
+dotnet_diagnostic.IDE0005.severity = warning
+dotnet_diagnostic.IDE0059.severity = warning
+dotnet_diagnostic.IDE0060.severity = warning
+
+# Formatting
+dotnet_diagnostic.IDE0055.severity = warning
+
+# Style
+csharp_prefer_braces = true:warning
+dotnet_style_prefer_is_null_check_over_reference_equality_method = true:warning
+
+# Quality
+dotnet_code_quality.CA1051.exclude_structs = true
+
+# IDE0011: Add braces
+dotnet_diagnostic.IDE0011.severity = none
+
+# IDE0055: No IFormatProvider
+dotnet_diagnostic.CA1305.severity = none
