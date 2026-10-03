@@ -176,6 +176,24 @@ class ParticleContainer3D
     {
         float sigma2 = parameters.Sigma * parameters.Sigma;
 
+        for (int i = 0; i < particles.Length; i++)
+        {
+            int gridIndex = GetGridIndex(particles[i].Position);
+            gridHead[gridIndex] = -1; // Reset cellen, dette resetter alle celler med partikler i, alle andre er allerede sat til -1, så det er ikke nødvendigt at sætte dem igen
+        }
+
+        for (int i = 0; i < particles.Length; i++)
+        {
+            particles[i].ApplyHalfAcceleration(parameters.Mass); // Velocity verlet integration
+            particles[i].Update(BoxSize, parameters.Radius); // Flytter partiklerne og håndterer kollisioner med væggene
+            particles[i].ResetAcceleration(); // Nulstil acceleration efter opdatering, så den ikke akkumuleres over tid
+
+            int gridIndex = GetGridIndex(particles[i].Position); // Find cellen som partikel i befinder sig i efter opdateringen
+            int currentHead = gridHead[gridIndex]; // Gem den nuværende første partikel i cellen
+            gridHead[gridIndex] = i; // Sæt partikel i som den nye første partikel i cellen
+            gridNext[i] = currentHead; // Sæt partiklen til at pege på den tidligere første partikel i cellen
+        }
+
         // Loop igennem alle par af partikler og beregn kraften mellem dem
         ForEachNeighborPair((i, j, d2) =>
         {
@@ -186,18 +204,7 @@ class ParticleContainer3D
 
         for (int i = 0; i < particles.Length; i++)
         {
-            int gridIndex = GetGridIndex(particles[i].Position);
-            gridHead[gridIndex] = -1; // Reset cellen, dette resetter alle celler med partikler i, alle andre er allerede sat til -1, så det er ikke nødvendigt at sætte dem igen
-        }
-
-        for (int i = 0; i < particles.Length; i++)
-        {
-            particles[i].Update(BoxSize, parameters.Radius); // Flytter partiklerne og håndterer kollisioner med væggene
-
-            int gridIndex = GetGridIndex(particles[i].Position); // Find cellen som partikel i befinder sig i efter opdateringen
-            int currentHead = gridHead[gridIndex]; // Gem den nuværende første partikel i cellen
-            gridHead[gridIndex] = i; // Sæt partikel i som den nye første partikel i cellen
-            gridNext[i] = currentHead; // Sæt partiklen til at pege på den tidligere første partikel i cellen
+            particles[i].ApplyHalfAcceleration(parameters.Mass); // Velocity verlet integration
         }
     }
 }

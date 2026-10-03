@@ -7,9 +7,20 @@ struct Particle3D(Vector3 position, Vector3 velocity)
     public Vector3 Position { get; private set; } = position;
     public Vector3 Velocity { get; private set; } = velocity;
 
+    public Vector3 Acceleration { get; private set; } = Vector3.Zero;
     public void ApplyForce(Vector3 force, float mass)
     {
-        Velocity += force / mass * Globals.SimulationStepTimePs;
+        Acceleration += force / mass;
+    }
+
+    public void ApplyHalfAcceleration(float mass)
+    {
+        Velocity += Acceleration * (Globals.SimulationStepTimePs / 2f);
+    }
+
+    public void ResetAcceleration()
+    {
+        Acceleration = Vector3.Zero;
     }
 
     public void Update(Vector3 boxSize, float radius)
