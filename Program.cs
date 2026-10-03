@@ -50,17 +50,20 @@ void Draw()
 
     renderer.Draw();
 
-    Raylib.DrawText("Total Kinetic Energy: " + particleContainer.GetTotalKineticEnergy().ToString("F2"), 10, 30, 20, Color.White);
-    Raylib.DrawText("Total Potential Energy: " + particleContainer.GetTotalPotentialEnergy().ToString("F2"), 10, 60, 20, Color.White);
-    Raylib.DrawText("Total Energy: " + (particleContainer.GetTotalKineticEnergy() + particleContainer.GetTotalPotentialEnergy()).ToString("F2"), 10, 90, 20, Color.White);
+    float kineticEnergy = particleContainer.GetTotalKineticEnergy();
+    float potentialEnergy = particleContainer.GetTotalPotentialEnergy();
+    float totalEnergy = kineticEnergy + potentialEnergy;
+    float temperatureK = particleContainer.GetTemperature();
+    float temperatureC = temperatureK - 273.15f;
 
-    var temperatureK = particleContainer.GetTemperature();
-    var temperatureC = temperatureK - 273.15f;
+    Raylib.DrawText("Total Kinetic Energy: " + kineticEnergy.ToString("F2"), 10, 30, 20, Color.White);
+    Raylib.DrawText("Total Potential Energy: " + potentialEnergy.ToString("F2"), 10, 60, 20, Color.White);
+    Raylib.DrawText("Total Energy: " + totalEnergy.ToString("F2"), 10, 90, 20, Color.White);
     Raylib.DrawText("Temperature: " + temperatureK.ToString("F2") + " K (" + temperatureC.ToString("F2") + " °C)", 10, 120, 20, Color.White);
     Raylib.DrawText("Simulation Time: " + (totalStepCount * Globals.SimulationStepTimePs).ToString("F0") + " ps", 10, 150, 20, Color.White);
 
     renderer.cameraDistance *= MathF.Pow(0.95f, Raylib.GetMouseWheelMove());
-
+    
     if (Raylib.IsMouseButtonDown(MouseButton.Left))
     {
         var mouseDelta = Raylib.GetMouseDelta();
@@ -82,7 +85,7 @@ namespace ParticleSimulation
         public const int ScreenHeight = 720;
 
         public const int Fps = 60;
-        public const int Sps = 1000;
+        public const int Sps = 10000;
 
         public const float RealFrameTime = 1f / Fps;
         public const float RealStepTime = 1f / Sps;

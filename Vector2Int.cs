@@ -32,4 +32,13 @@ public static class Extensions
         var r = MathF.Sqrt(1 - z * z);
         return new Vector3(r * MathF.Cos(angle), r * MathF.Sin(angle), z);
     }
+
+    public static T[] Populate<T>(this T[] arr, T value)
+    {
+        for (int i = 0; i < arr.Length; i++)
+        {
+            arr[i] = value;
+        }
+        return arr;
+    }
 }

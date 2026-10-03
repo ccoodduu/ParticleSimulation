@@ -116,9 +116,14 @@ static class LennardJonesPotential
         return potentialEnergy - offset;
     }
 
+    public static float GetCutoffDistance(float sigma, float scalar)
+    {
+        return sigma * scalar;
+    }
+
     public static float GetCutoffDistance2(float sigma, float scalar)
     {
-        float s = sigma * scalar;
+        float s = GetCutoffDistance(sigma, scalar);
         return s * s;
     }
 }
