@@ -8,6 +8,7 @@ struct Particle3D(Vector3 position, Vector3 velocity)
     public Vector3 Velocity { get; private set; } = velocity;
 
     public Vector3 Acceleration { get; private set; } = Vector3.Zero;
+
     public void ApplyForce(Vector3 force, float mass)
     {
         Acceleration += force / mass;
@@ -23,41 +24,52 @@ struct Particle3D(Vector3 position, Vector3 velocity)
         Acceleration = Vector3.Zero;
     }
 
-    public void Update(Vector3 boxSize, float radius)
+    public void Update(Vector3 boxSize)
     {
         Position += Velocity * Globals.SimulationStepTimePs;
 
-        HandleBoundaryCollision(boxSize, radius);
+        HandleBoundaryCollision(boxSize);
     }
 
-    private void HandleBoundaryCollision(Vector3 boxSize, float radius)
+    // Partiklerne er punktpartikler, så væggene ligger ved 0 og boxSize
+    private void HandleBoundaryCollision(Vector3 boxSize)
     {
-        if (Position.X < radius)
+        var newVelocity = Velocity;
+        var newPosition = Position;
+
+        if (Position.X < 0)
         {
-            Velocity *= new Vector3(-1, 1, 1);
+            newVelocity.X *= -1;
+            newPosition.X = -Position.X;
         }
-        if (Position.X > boxSize.X - radius)
+        if (Position.X > boxSize.X)
         {
-            Velocity *= new Vector3(-1, 1, 1);
+            newVelocity.X *= -1;
+            newPosition.X = 2 * boxSize.X - Position.X;
         }
-        if (Position.Y < radius)
+        if (Position.Y < 0)
         {
-            Velocity *= new Vector3(1, -1, 1);
+            newVelocity.Y *= -1;
+            newPosition.Y = -Position.Y;
         }
-        if (Position.Y > boxSize.Y - radius)
+        if (Position.Y > boxSize.Y)
         {
-            Velocity *= new Vector3(1, -1, 1);
+            newVelocity.Y *= -1;
+            newPosition.Y = 2 * boxSize.Y - Position.Y;
         }
-        if (Position.Z < radius)
+        if (Position.Z < 0)
         {
-            Velocity *= new Vector3(1, 1, -1);
+            newVelocity.Z *= -1;
+            newPosition.Z = -Position.Z;
         }
-        if (Position.Z > boxSize.Z - radius)
+        if (Position.Z > boxSize.Z)
         {
-            Velocity *= new Vector3(1, 1, -1);
+            newVelocity.Z *= -1;
+            newPosition.Z = 2 * boxSize.Z - Position.Z;
         }
 
-        Position = Vector3.Clamp(Position, new Vector3(radius), boxSize - new Vector3(radius));
+        Velocity = newVelocity;
+        Position = newPosition;
     }
 }
 

@@ -30,8 +30,6 @@ class ParticleContainer3D
         this.parameters = parameters;
 
         particles = new Particle3D[numParticles];
-        const float radius = 0.5f;
-        var spawnArea = BoxSize - new Vector3(radius * 2);
 
         float minCellSize = LennardJonesCutoff;
         gridCellsX = (int)MathF.Max(BoxSize.X / minCellSize, 1);
@@ -42,15 +40,15 @@ class ParticleContainer3D
         gridHead = new int[gridCellsX * gridCellsY * gridCellsZ].Populate(-1);
         gridNext = new int[numParticles].Populate(-1);
 
-        // Spawn partiklerne i et 3D gitter, så de ikke overlapper hinanden
+        // Spawn partiklerne i midten af hver celle i et 3D gitter, så de ikke overlapper hinanden og har lige stor afstand til alle vægge
         int x = 0;
         int y = 0;
         int z = 0;
         int particlesPerRow = (int)MathF.Ceiling(MathF.Cbrt(numParticles));
-        Vector3 stepDistance = spawnArea / new Vector3(particlesPerRow);
+        Vector3 stepDistance = BoxSize / new Vector3(particlesPerRow);
         for (int i = 0; i < numParticles; i++)
         {
-            var pos = new Vector3(radius) + new Vector3(x, y, z) * stepDistance;
+            var pos = (new Vector3(x, y, z) + new Vector3(0.5f)) * stepDistance;
             var velocity = random.NextUnitVector3() * 3.5f;
             particles[i] = new Particle3D(pos, velocity);
 
@@ -185,7 +183,7 @@ class ParticleContainer3D
         for (int i = 0; i < particles.Length; i++)
         {
             particles[i].ApplyHalfAcceleration(parameters.Mass); // Velocity verlet integration
-            particles[i].Update(BoxSize, parameters.Radius); // Flytter partiklerne og håndterer kollisioner med væggene
+            particles[i].Update(BoxSize); // Flytter partiklerne og håndterer kollisioner med væggene
             particles[i].ResetAcceleration(); // Nulstil acceleration efter opdatering, så den ikke akkumuleres over tid
 
             int gridIndex = GetGridIndex(particles[i].Position); // Find cellen som partikel i befinder sig i efter opdateringen

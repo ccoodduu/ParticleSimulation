@@ -6,7 +6,7 @@ Raylib.SetConfigFlags(ConfigFlags.ResizableWindow);
 Raylib.InitWindow(Globals.ScreenWidth, Globals.ScreenHeight, "Particle Simulation");
 Raylib.SetTargetFPS(Globals.Fps);
 
-var particleContainer = new ParticleContainer3D(1000, new Vector3(1000, 1000, 1000), ParticleParameters.Argon);
+var particleContainer = new ParticleContainer3D(1000, new Vector3(100, 100, 100), ParticleParameters.Argon);
 var renderer = new Renderer3D(particleContainer);
 
 const int maxStepsPerFrame = Globals.Sps / Globals.Fps * 2;
@@ -85,7 +85,7 @@ namespace ParticleSimulation
         public const int ScreenHeight = 720;
 
         public const int Fps = 60;
-        public const int Sps = 10000;
+        public const int Sps = 1000;
 
         public const float RealFrameTime = 1f / Fps;
         public const float RealStepTime = 1f / Sps;
