@@ -104,6 +104,10 @@ static class LennardJonesPotential
     {
         float distance2 = Vector3.DistanceSquared(p1, p2); // Beregn afstanden i anden mellem de to partikler (r^2). Afstanden kaldes ofte r i formlen for Lennard-Jones potentialet.
 
+        return CalculatePotentialEnergyWithCutoff(distance2, sigma2, epsilon, cutoff2, offset);
+    }
+    public static float CalculatePotentialEnergyWithCutoff(float distance2, float sigma2, float epsilon, float cutoff2, float offset)
+    {
         if (distance2 > cutoff2) return 0f;
 
         float sigmaOverR2 = sigma2 / distance2;

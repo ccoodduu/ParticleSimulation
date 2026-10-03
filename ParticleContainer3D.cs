@@ -101,13 +101,11 @@ class ParticleContainer3D
         float offset = LennardJonesPotential.CalculatePotentialEnergy(cutoff2, sigma2, parameters.Epsilon);
 
         float totalPotentialEnergy = 0f;
-        for (int i = 0; i < particles.Length; i++)
+        ForEachNeighborPair((i, j, d2) =>
         {
-            for (int j = i + 1; j < particles.Length; j++)
-            {
-                totalPotentialEnergy += LennardJonesPotential.CalculatePotentialEnergyWithCutoff(particles[i].Position, particles[j].Position, sigma2, parameters.Epsilon, cutoff2, offset);
-            }
-        }
+            totalPotentialEnergy += LennardJonesPotential.CalculatePotentialEnergyWithCutoff(d2, sigma2, parameters.Epsilon, cutoff2, offset);
+        });
+
         return totalPotentialEnergy;
     }
 
@@ -122,12 +120,12 @@ class ParticleContainer3D
         return temperature;
     }
 
-    public void Update()
+    // Udfører funktionen `action` på hvert par af partikler, der er indenfor LennardJonesCutoff i gitteret.
+    // Dette bruges til at beregne kræfter og potentielle energier mellem partiklerne.
+    private void ForEachNeighborPair(Action<int, int, float> action)
     {
         float cutoff2 = LennardJonesCutoff2;
-        float sigma2 = parameters.Sigma * parameters.Sigma;
 
-        // Loop igennem alle par af partikler og beregn kraften mellem dem
         for (int i = 0; i < particles.Length; i++)
         {
             var gridIndex = GetGridIndex(particles[i].Position); // Find cellen som partikel i befinder sig i
@@ -160,19 +158,31 @@ class ParticleContainer3D
 
                             if (j <= i) continue; // Skip sig selv eller partikler der allerede er blevet behandlet for at undgå dobbelttælling
 
-                            if (Vector3.DistanceSquared(particles[i].Position, particles[j].Position) > cutoff2)
+                            float d2 = Vector3.DistanceSquared(particles[i].Position, particles[j].Position);
+                            if (d2 > cutoff2)
                             {
                                 continue; // Spring over hvis partiklerne er langt fra hinanden, da det giver en kraft der nærmest er 0
                             }
 
-                            var force = LennardJonesPotential.CalculateForce(particles[i].Position, particles[j].Position, sigma2, parameters.Epsilon);
-                            particles[i].ApplyForce(force, parameters.Mass);
-                            particles[j].ApplyForce(-force, parameters.Mass);
+                            action(i, j, d2); // Udfør handlingen på partikelparret
                         }
                     }
                 }
             }
         }
+    }
+
+    public void Update()
+    {
+        float sigma2 = parameters.Sigma * parameters.Sigma;
+
+        // Loop igennem alle par af partikler og beregn kraften mellem dem
+        ForEachNeighborPair((i, j, d2) =>
+        {
+            var force = LennardJonesPotential.CalculateForce(particles[i].Position, particles[j].Position, sigma2, parameters.Epsilon);
+            particles[i].ApplyForce(force, parameters.Mass);
+            particles[j].ApplyForce(-force, parameters.Mass);
+        });
 
         for (int i = 0; i < particles.Length; i++)
         {

@@ -53,7 +53,7 @@ void Draw()
     float kineticEnergy = particleContainer.GetTotalKineticEnergy();
     float potentialEnergy = particleContainer.GetTotalPotentialEnergy();
     float totalEnergy = kineticEnergy + potentialEnergy;
-    float temperatureK = particleContainer.GetTemperature();
+    float temperatureK = particleContainer.GetTemperature(kineticEnergy);
     float temperatureC = temperatureK - 273.15f;
 
     Raylib.DrawText("Total Kinetic Energy: " + kineticEnergy.ToString("F2"), 10, 30, 20, Color.White);
@@ -63,7 +63,7 @@ void Draw()
     Raylib.DrawText("Simulation Time: " + (totalStepCount * Globals.SimulationStepTimePs).ToString("F0") + " ps", 10, 150, 20, Color.White);
 
     renderer.cameraDistance *= MathF.Pow(0.95f, Raylib.GetMouseWheelMove());
-    
+
     if (Raylib.IsMouseButtonDown(MouseButton.Left))
     {
         var mouseDelta = Raylib.GetMouseDelta();
