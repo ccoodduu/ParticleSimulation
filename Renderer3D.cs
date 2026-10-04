@@ -17,7 +17,7 @@ class Renderer3D
     private Mesh particleBillboardTriangleMesh;
     private Shader particleShader;
     private Material particleMaterial;
-    private Matrix4x4[] transforms;
+    private readonly Matrix4x4[] transforms;
 
     public Renderer3D(ParticleContainer3D container)
     {

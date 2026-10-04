@@ -14,7 +14,7 @@ struct Particle3D(Vector3 position, Vector3 velocity)
         Acceleration += force / mass;
     }
 
-    public void ApplyHalfAcceleration(float mass)
+    public void ApplyHalfAcceleration()
     {
         Velocity += Acceleration * (Globals.SimulationStepTimePs / 2f);
     }

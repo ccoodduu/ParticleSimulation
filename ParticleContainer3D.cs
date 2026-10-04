@@ -22,7 +22,7 @@ class ParticleContainer3D
 
     private readonly Vector3 cellSize; // Størrelsen af hver celle i gitteret
 
-    private readonly Queue<float> presurreMeasurements = new Queue<float>();
+    private readonly Queue<float> pressureMeasurements = new();
 
     private float LennardJonesCutoff2 => LennardJonesPotential.GetCutoffDistance2(parameters.Sigma, 3);
     private float LennardJonesCutoff => LennardJonesPotential.GetCutoffDistance(parameters.Sigma, 3);
@@ -121,14 +121,14 @@ class ParticleContainer3D
     }
     public float GetTemperature(float totalKineticEnergy)
     {
-        float temperature = (2f / 3f) * (totalKineticEnergy / particles.Length) /    0.8314456946f;
+        float temperature = (2f / 3f) * (totalKineticEnergy / particles.Length) / 0.8314456946f;
         return temperature;
     }
 
     public float GetPressure()
     {
-        if (presurreMeasurements.Count == 0) return 0f;
-        return presurreMeasurements.Average();
+        if (pressureMeasurements.Count == 0) return 0f;
+        return pressureMeasurements.Average();
     }
     // Udfører funktionen `action` på hvert par af partikler, der er indenfor LennardJonesCutoff i gitteret.
     // Dette bruges til at beregne kræfter og potentielle energier mellem partiklerne.
@@ -196,7 +196,7 @@ class ParticleContainer3D
 
         for (int i = 0; i < particles.Length; i++)
         {
-            particles[i].ApplyHalfAcceleration(parameters.Mass); // Velocity verlet integration
+            particles[i].ApplyHalfAcceleration(); // Velocity Verlet integration
 
             float velocityChange = particles[i].Update(BoxSize); // Flytter partiklerne og håndterer kollisioner med væggene
             totalVelocityChange += velocityChange;
@@ -210,8 +210,8 @@ class ParticleContainer3D
         }
 
         float pressure = totalVelocityChange * parameters.Mass / BoxSurfaceArea / Globals.SimulationStepTimePs; // Enheden er u*(Å/ps^2), hvilket er en enhed for tryk.
-        presurreMeasurements.Enqueue(pressure);
-        if (presurreMeasurements.Count > 10000) presurreMeasurements.Dequeue();
+        pressureMeasurements.Enqueue(pressure);
+        if (pressureMeasurements.Count > 10000) pressureMeasurements.Dequeue();
 
         // Loop igennem alle par af partikler og beregn kraften mellem dem
         ForEachNeighborPair((i, j, d2) =>
@@ -223,7 +223,7 @@ class ParticleContainer3D
 
         for (int i = 0; i < particles.Length; i++)
         {
-            particles[i].ApplyHalfAcceleration(parameters.Mass); // Velocity verlet integration
+            particles[i].ApplyHalfAcceleration(); // Velocity Verlet integration
         }
     }
 }
