@@ -121,7 +121,7 @@ class ParticleSimulation3D
     }
     public float GetTemperature(float totalKineticEnergy)
     {
-        float temperature = (2f / 3f) * (totalKineticEnergy / particles.Length) / 0.8314456946f;
+        float temperature = (2f / 3f) * (totalKineticEnergy / particles.Length) / (float)Units.BoltzmannConstant;
         return temperature;
     }
 

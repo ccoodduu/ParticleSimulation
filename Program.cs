@@ -6,7 +6,7 @@ Raylib.SetConfigFlags(ConfigFlags.ResizableWindow);
 Raylib.InitWindow(Globals.ScreenWidth, Globals.ScreenHeight, "Particle Simulation");
 Raylib.SetTargetFPS(Globals.Fps);
 
-var simulationParameters = new SimulationParameters(10000, new Vector3(100), 3.5f);
+var simulationParameters = new SimulationParameters(1000, new Vector3(100), 3.5f);
 
 var particleSimulation = new ParticleSimulation3D(simulationParameters, ParticleParameters.Argon);
 var renderer = new Renderer3D(particleSimulation);
@@ -57,8 +57,8 @@ void Draw()
     float totalEnergy = kineticEnergy + potentialEnergy;
     float temperatureK = particleSimulation.GetTemperature(kineticEnergy);
     float temperatureC = temperatureK - 273.15f;
-    float pressure = particleSimulation.GetPressure(); // Enheden er u / (Å * ps^2)
-    float pressureKPa = pressure * 1.660540200e7f / 1000f;
+    float pressure = particleSimulation.GetPressure();
+    float pressureKPa = pressure * (float)Units.PascalPerPressureUnit / 1000f;
 
     Raylib.DrawText("Total Kinetic Energy: " + kineticEnergy.ToString("F2"), 10, 30, 20, Color.White);
     Raylib.DrawText("Total Potential Energy: " + potentialEnergy.ToString("F2"), 10, 60, 20, Color.White);
@@ -94,7 +94,5 @@ namespace ParticleSimulation
 
         public const float RealFrameTime = 1f / Fps;
         public const float RealStepTime = 1f / Sps;
-
-        public const float PsPerSecond = 1_000_000_000_000f;
     }
 }
