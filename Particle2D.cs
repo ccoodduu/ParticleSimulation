@@ -21,9 +21,9 @@ class Particle2D
         this.color = Color.White;
     }
 
-    public void Update()
+    public void Update(float dt)
     {
-        position += velocity * Globals.SimulationStepTimePs;
+        position += velocity * dt;
 
         if (position.X < radius)
         {

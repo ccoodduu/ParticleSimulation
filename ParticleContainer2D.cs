@@ -22,8 +22,8 @@ class ParticleContainer2D
         for (int i = 0; i < numParticles; i++)
         {
             var pos = new Vector2(radius + (float)random.NextDouble() * spawnArea.X, radius + (float)random.NextDouble() * spawnArea.Y);
-            var velocty = random.NextUnitVector() * 10;
-            particles.Add(new Particle2D(this, pos, velocty, radius));
+            var velocity = random.NextUnitVector() * 10;
+            particles.Add(new Particle2D(this, pos, velocity, radius));
         }
     }
 
@@ -31,7 +31,7 @@ class ParticleContainer2D
     {
         foreach (var particle in particles)
         {
-            particle.Update();
+            particle.Update(1f);
         }
     }
 

@@ -2,17 +2,20 @@ using System.Numerics;
 
 namespace ParticleSimulation;
 
-class ParticleContainer3D
+class ParticleSimulation3D
 {
+    public readonly ParticleParameters ParticleParameters;
+
+    public readonly SimulationParameters SimulationParameters;
+    private int ParticleCount => SimulationParameters.ParticleCount;
+    public Vector3 BoxSize => SimulationParameters.BoxSize;
+    public float BoxSurfaceArea => (BoxSize.X * BoxSize.Y + BoxSize.Y * BoxSize.Z + BoxSize.Z * BoxSize.X) * 2;
+    public float BoxVolume => BoxSize.X * BoxSize.Y * BoxSize.Z;
+
+    private readonly Random random;
+
     private readonly Particle3D[] particles;
     public IReadOnlyList<Particle3D> Particles => particles;
-
-    public readonly Vector3 BoxSize;
-    public readonly float BoxSurfaceArea;
-    public readonly float BoxVolume;
-    public readonly Random random;
-
-    public ParticleParameters parameters;
 
     // Linked list til at holde styr på hvilke partikler der er i hvilke celler i gitteret, 
     private readonly int[] gridNext; // Et entry for hver partikel, der holder indekset til den næste partikel i samme celle. Hvis der ikke er nogen næste partikel, er værdien -1.
@@ -24,19 +27,16 @@ class ParticleContainer3D
 
     private readonly Queue<float> pressureMeasurements = new();
 
-    private float LennardJonesCutoff2 => LennardJonesPotential.GetCutoffDistance2(parameters.Sigma, 3);
-    private float LennardJonesCutoff => LennardJonesPotential.GetCutoffDistance(parameters.Sigma, 3);
-    public ParticleContainer3D(int numParticles, Vector3 worldSize, ParticleParameters parameters)
+    private float LennardJonesCutoff2 => LennardJones.GetCutoffDistance2(ParticleParameters.Sigma, SimulationParameters.LennardJonesCutoffMultiplier);
+    private float LennardJonesCutoff => LennardJones.GetCutoffDistance(ParticleParameters.Sigma, SimulationParameters.LennardJonesCutoffMultiplier);
+    public ParticleSimulation3D(SimulationParameters simulationParameters, ParticleParameters particleParameters)
     {
         random = new Random();
 
-        BoxSize = worldSize;
-        BoxSurfaceArea = (BoxSize.X * BoxSize.Y + BoxSize.Y * BoxSize.Z + BoxSize.Z * BoxSize.X) * 2;
-        BoxVolume = BoxSize.X * BoxSize.Y * BoxSize.Z;
+        SimulationParameters = simulationParameters;
+        ParticleParameters = particleParameters;
 
-        this.parameters = parameters;
-
-        particles = new Particle3D[numParticles];
+        particles = new Particle3D[ParticleCount];
 
         float minCellSize = LennardJonesCutoff;
         gridCellsX = (int)MathF.Max(BoxSize.X / minCellSize, 1);
@@ -45,18 +45,18 @@ class ParticleContainer3D
         cellSize = BoxSize / new Vector3(gridCellsX, gridCellsY, gridCellsZ);
 
         gridHead = new int[gridCellsX * gridCellsY * gridCellsZ].Populate(-1);
-        gridNext = new int[numParticles].Populate(-1);
+        gridNext = new int[ParticleCount].Populate(-1);
 
         // Spawn partiklerne i midten af hver celle i et 3D gitter, så de ikke overlapper hinanden og har lige stor afstand til alle vægge
         int x = 0;
         int y = 0;
         int z = 0;
-        int particlesPerRow = (int)MathF.Ceiling(MathF.Cbrt(numParticles));
+        int particlesPerRow = (int)MathF.Ceiling(MathF.Cbrt(ParticleCount));
         Vector3 stepDistance = BoxSize / new Vector3(particlesPerRow);
-        for (int i = 0; i < numParticles; i++)
+        for (int i = 0; i < ParticleCount; i++)
         {
             var pos = (new Vector3(x, y, z) + new Vector3(0.5f)) * stepDistance;
-            var velocity = random.NextUnitVector3() * 3.5f;
+            var velocity = random.NextUnitVector3() * simulationParameters.ParticleStartVelocity;
             particles[i] = new Particle3D(pos, velocity);
 
             var gridIndex = GetGridIndex(pos); // Find cellen som partikel i befinder sig i
@@ -92,7 +92,7 @@ class ParticleContainer3D
         for (int i = 0; i < particles.Length; i++)
         {
             var speedSquared = particles[i].Velocity.LengthSquared();
-            totalKineticEnergy += 0.5f * parameters.Mass * speedSquared;
+            totalKineticEnergy += 0.5f * ParticleParameters.Mass * speedSquared;
         }
 
         return totalKineticEnergy;
@@ -101,14 +101,14 @@ class ParticleContainer3D
     public float GetTotalPotentialEnergy()
     {
         float cutoff2 = LennardJonesCutoff2;
-        float sigma2 = parameters.Sigma * parameters.Sigma;
+        float sigma2 = ParticleParameters.Sigma * ParticleParameters.Sigma;
 
-        float offset = LennardJonesPotential.CalculatePotentialEnergy(cutoff2, sigma2, parameters.Epsilon);
+        float offset = LennardJones.CalculatePotentialEnergy(cutoff2, sigma2, ParticleParameters.Epsilon);
 
         float totalPotentialEnergy = 0f;
         ForEachNeighborPair((i, j, d2) =>
         {
-            totalPotentialEnergy += LennardJonesPotential.CalculatePotentialEnergyWithCutoff(d2, sigma2, parameters.Epsilon, cutoff2, offset);
+            totalPotentialEnergy += LennardJones.CalculatePotentialEnergyWithCutoff(d2, sigma2, ParticleParameters.Epsilon, cutoff2, offset);
         });
 
         return totalPotentialEnergy;
@@ -130,6 +130,7 @@ class ParticleContainer3D
         if (pressureMeasurements.Count == 0) return 0f;
         return pressureMeasurements.Average();
     }
+
     // Udfører funktionen `action` på hvert par af partikler, der er indenfor LennardJonesCutoff i gitteret.
     // Dette bruges til at beregne kræfter og potentielle energier mellem partiklerne.
     private void ForEachNeighborPair(Action<int, int, float> action)
@@ -184,7 +185,7 @@ class ParticleContainer3D
 
     public void Update()
     {
-        float sigma2 = parameters.Sigma * parameters.Sigma;
+        float sigma2 = ParticleParameters.Sigma * ParticleParameters.Sigma;
 
         for (int i = 0; i < particles.Length; i++)
         {
@@ -196,9 +197,9 @@ class ParticleContainer3D
 
         for (int i = 0; i < particles.Length; i++)
         {
-            particles[i].ApplyHalfAcceleration(); // Velocity Verlet integration
+            particles[i].ApplyHalfAcceleration(SimulationParameters.TimePerStepPs); // Velocity Verlet integration
 
-            float velocityChange = particles[i].Update(BoxSize); // Flytter partiklerne og håndterer kollisioner med væggene
+            float velocityChange = particles[i].Update(BoxSize, SimulationParameters.TimePerStepPs); // Flytter partiklerne og håndterer kollisioner med væggene
             totalVelocityChange += velocityChange;
 
             particles[i].ResetAcceleration(); // Nulstil acceleration efter opdatering, så den ikke akkumuleres over tid
@@ -209,56 +210,21 @@ class ParticleContainer3D
             gridNext[i] = currentHead; // Sæt partiklen til at pege på den tidligere første partikel i cellen
         }
 
-        float pressure = totalVelocityChange * parameters.Mass / BoxSurfaceArea / Globals.SimulationStepTimePs; // Enheden er u*(Å/ps^2), hvilket er en enhed for tryk.
+        float pressure = totalVelocityChange * ParticleParameters.Mass / BoxSurfaceArea / SimulationParameters.TimePerStepPs; // Enheden er u*(Å/ps^2), hvilket er en enhed for tryk.
         pressureMeasurements.Enqueue(pressure);
         if (pressureMeasurements.Count > 10000) pressureMeasurements.Dequeue();
 
         // Loop igennem alle par af partikler og beregn kraften mellem dem
         ForEachNeighborPair((i, j, d2) =>
         {
-            var force = LennardJonesPotential.CalculateForce(particles[i].Position, particles[j].Position, sigma2, parameters.Epsilon);
-            particles[i].ApplyForce(force, parameters.Mass);
-            particles[j].ApplyForce(-force, parameters.Mass);
+            var force = LennardJones.CalculateForce(particles[i].Position, particles[j].Position, sigma2, ParticleParameters.Epsilon);
+            particles[i].ApplyForce(force, ParticleParameters.Mass);
+            particles[j].ApplyForce(-force, ParticleParameters.Mass);
         });
 
         for (int i = 0; i < particles.Length; i++)
         {
-            particles[i].ApplyHalfAcceleration(); // Velocity Verlet integration
+            particles[i].ApplyHalfAcceleration(SimulationParameters.TimePerStepPs); // Velocity Verlet integration
         }
     }
-}
-
-public struct ParticleParameters
-{
-    public float Radius; // Kun visuelt. Partiklens radius i angstoms (Å)
-    public float Mass; // Partiklens masse i units (u)
-    public float Sigma; // Partiklens sigma i angstoms (Å)
-    public float Epsilon; // Partiklens epsilon i enheder af energi (u*Å^2/ps^2)
-
-    public ParticleParameters()
-    {
-        Radius = 0.5f;
-        Mass = 1f;
-        Sigma = 1f;
-        Epsilon = 1f;
-    }
-
-    public static ParticleParameters Default => new();
-
-    // TODO: Skriv kilde på disse værdier.
-    public static ParticleParameters Xenon => new()
-    {
-        Radius = 4.10f / 2f,
-        Mass = 131.29f,
-        Sigma = 4.10f,
-        Epsilon = 177f
-    };
-    public static ParticleParameters Argon => new()
-    {
-        Radius = 3.405f / 2f,
-        Mass = 39.948f,
-        Sigma = 3.405f,
-        Epsilon = 99.6f
-    };
-
 }
