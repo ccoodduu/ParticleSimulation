@@ -91,9 +91,10 @@ public static class Experiments
                 float temperature = measurement.Temperature * (float)Units.BoltzmannConstant / particleParameters.Epsilon;
                 float potentialEnergy = measurement.PotentialEnergy / (particleCount * particleParameters.Epsilon);
                 float pressure = measurement.Pressure * MathF.Pow(particleParameters.Sigma, 3) / particleParameters.Epsilon;
+                float virialPressure = measurement.VirialPressure * MathF.Pow(particleParameters.Sigma, 3) / particleParameters.Epsilon;
                 float temperatureError = temperature - reference.Temperature;
 
-                Console.WriteLine($"T* = {reference.Temperature}, ρ* = {reference.Density}, forsøg {attempt}: v0 = {startVelocity:F4} Å/ps, målt T* = {temperature:F4}, U* = {potentialEnergy:G5} (NIST {reference.PotentialEnergy:G5}), p* = {pressure:G5} (NIST {reference.Pressure:G5})");
+                Console.WriteLine($"T* = {reference.Temperature}, ρ* = {reference.Density}, forsøg {attempt}: v0 = {startVelocity:F4} Å/ps, målt T* = {temperature:F4}, U* = {potentialEnergy:G5} (NIST {reference.PotentialEnergy:G5}), p* = {pressure:G5}, virial p* = {virialPressure:G5} (NIST {reference.Pressure:G5})");
 
                 if (MathF.Abs(temperatureError) > temperatureTolerance && attempt < maxAttempts)
                 {
@@ -108,7 +109,7 @@ public static class Experiments
                 lines[i] = string.Join(';', new float[]
                 {
                     reference.Temperature, reference.Density, particleCount, boxSide, startVelocity, attempt,
-                    temperature, potentialEnergy, pressure,
+                    temperature, potentialEnergy, pressure, virialPressure,
                     reference.PotentialEnergy, reference.Pressure,
                     potentialEnergy - reference.PotentialEnergy, expectedPotentialEnergyDeviation,
                     pressure - reference.Pressure, expectedPressureDeviation,
@@ -117,7 +118,7 @@ public static class Experiments
             }
         });
 
-        const string header = "TargetT;Density;ParticleCount;BoxSideAngstrom;StartVelocity;Attempts;T;U;P;NistU;NistP;UDeviation;ExpectedUDeviation;PDeviation;ExpectedPDeviation";
+        const string header = "TargetT;Density;ParticleCount;BoxSideAngstrom;StartVelocity;Attempts;T;U;P;VirialP;NistU;NistP;UDeviation;ExpectedUDeviation;PDeviation;ExpectedPDeviation";
 
         const string path = "nist_vapor_experiment.csv";
         File.WriteAllLines(path, lines.Prepend(header));

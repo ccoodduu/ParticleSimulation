@@ -27,6 +27,8 @@ class ParticleSimulation3D
 
     private readonly Queue<float> pressureMeasurements = new();
 
+    private float lastVirial;
+
     private float LennardJonesCutoff2 => LennardJones.GetCutoffDistance2(ParticleParameters.Sigma, SimulationParameters.LennardJonesCutoffMultiplier);
     private float LennardJonesCutoff => LennardJones.GetCutoffDistance(ParticleParameters.Sigma, SimulationParameters.LennardJonesCutoffMultiplier);
     public ParticleSimulation3D(SimulationParameters simulationParameters, ParticleParameters particleParameters)
@@ -131,6 +133,16 @@ class ParticleSimulation3D
         return pressureMeasurements.Average();
     }
 
+    public float GetVirialPressure()
+    {
+        return GetVirialPressure(GetTotalKineticEnergy());
+    }
+    // P = (2K + Σ r_ij · F_ij) / (3V)
+    public float GetVirialPressure(float totalKineticEnergy)
+    {
+        return (2f * totalKineticEnergy + lastVirial) / (3f * BoxVolume);
+    }
+
     // Udfører funktionen `action` på hvert par af partikler, der er indenfor LennardJonesCutoff i gitteret.
     // Dette bruges til at beregne kræfter og potentielle energier mellem partiklerne.
     private void ForEachNeighborPair(Action<int, int, float> action)
@@ -215,12 +227,15 @@ class ParticleSimulation3D
         if (pressureMeasurements.Count > 10000) pressureMeasurements.Dequeue();
 
         // Loop igennem alle par af partikler og beregn kraften mellem dem
+        float virial = 0f;
         ForEachNeighborPair((i, j, d2) =>
         {
             var force = LennardJones.CalculateForce(particles[i].Position, particles[j].Position, sigma2, ParticleParameters.Epsilon);
             particles[i].ApplyForce(force, ParticleParameters.Mass);
             particles[j].ApplyForce(-force, ParticleParameters.Mass);
+            virial += Vector3.Dot(particles[i].Position - particles[j].Position, force);
         });
+        lastVirial = virial;
 
         for (int i = 0; i < particles.Length; i++)
         {
