@@ -2,6 +2,18 @@ using ParticleSimulation;
 using Raylib_cs;
 using System.Numerics;
 
+if (args.Contains("--nist-vapor"))
+{
+    Experiments.NistVaporExperiment();
+    return;
+}
+
+if (args.Contains("--experiment"))
+{
+    Experiments.StartVelocityExperiment();
+    return;
+}
+
 Raylib.SetConfigFlags(ConfigFlags.ResizableWindow);
 Raylib.InitWindow(Globals.ScreenWidth, Globals.ScreenHeight, "Particle Simulation");
 Raylib.SetTargetFPS(Globals.Fps);

@@ -7,7 +7,7 @@ class ParticleSimulation3D
     public readonly ParticleParameters ParticleParameters;
 
     public readonly SimulationParameters SimulationParameters;
-    private int ParticleCount => SimulationParameters.ParticleCount;
+    public int ParticleCount => SimulationParameters.ParticleCount;
     public Vector3 BoxSize => SimulationParameters.BoxSize;
     public float BoxSurfaceArea => (BoxSize.X * BoxSize.Y + BoxSize.Y * BoxSize.Z + BoxSize.Z * BoxSize.X) * 2;
     public float BoxVolume => BoxSize.X * BoxSize.Y * BoxSize.Z;
