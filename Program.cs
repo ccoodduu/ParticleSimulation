@@ -2,6 +2,12 @@ using ParticleSimulation;
 using Raylib_cs;
 using System.Numerics;
 
+if (args.Contains("--nist-liquid"))
+{
+    Experiments.NistLiquidExperiment();
+    return;
+}
+
 if (args.Contains("--nist-vapor"))
 {
     Experiments.NistVaporExperiment();

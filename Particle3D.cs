@@ -24,61 +24,20 @@ struct Particle3D(Vector3 position, Vector3 velocity)
         Acceleration = Vector3.Zero;
     }
 
-    // Opdaterer partiklens position og håndterer kollision med væggene, returnerer magnituden af hastighedsændringen som følge af væg-kollisioner.
-    public float Update(Vector3 boxSize, float dt)
+    // Flytter partiklen og sætter den ind på den modsatte side, hvis den forlader kassen
+    public void Update(Vector3 boxSize, float dt)
     {
-        Position += Velocity * dt;
-
-        return HandleBoundaryCollision(boxSize);
+        var position = Position + Velocity * dt;
+        position.X = Wrap(position.X, boxSize.X);
+        position.Y = Wrap(position.Y, boxSize.Y);
+        position.Z = Wrap(position.Z, boxSize.Z);
+        Position = position;
     }
 
-    // Partiklerne er punktpartikler, så væggene ligger ved 0 og boxSize, returnere magnituden af hastighedsændringen som følge af kollisionerne.
-    private float HandleBoundaryCollision(Vector3 boxSize)
+    private static float Wrap(float coordinate, float boxLength)
     {
-        float velocityChange = 0f;
-        var newVelocity = Velocity;
-        var newPosition = Position;
-
-        if (Position.X < 0)
-        {
-            newVelocity.X *= -1;
-            newPosition.X = -Position.X;
-            velocityChange += -Velocity.X * 2;
-        }
-        if (Position.X > boxSize.X)
-        {
-            newVelocity.X *= -1;
-            newPosition.X = 2 * boxSize.X - Position.X;
-            velocityChange += Velocity.X * 2;
-        }
-        if (Position.Y < 0)
-        {
-            newVelocity.Y *= -1;
-            newPosition.Y = -Position.Y;
-            velocityChange += -Velocity.Y * 2;
-        }
-        if (Position.Y > boxSize.Y)
-        {
-            newVelocity.Y *= -1;
-            newPosition.Y = 2 * boxSize.Y - Position.Y;
-            velocityChange += Velocity.Y * 2;
-        }
-        if (Position.Z < 0)
-        {
-            newVelocity.Z *= -1;
-            newPosition.Z = -Position.Z;
-            velocityChange += -Velocity.Z * 2;
-        }
-        if (Position.Z > boxSize.Z)
-        {
-            newVelocity.Z *= -1;
-            newPosition.Z = 2 * boxSize.Z - Position.Z;
-            velocityChange += Velocity.Z * 2;
-        }
-
-        Velocity = newVelocity;
-        Position = newPosition;
-
-        return velocityChange;
+        if (coordinate < 0) return coordinate + boxLength;
+        else if (coordinate >= boxLength) return coordinate - boxLength;
+        else return coordinate;
     }
 }

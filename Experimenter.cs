@@ -7,7 +7,6 @@ public struct Measurement
     public float KineticEnergy;
     public float PotentialEnergy;
     public float Pressure;
-    public float VirialPressure;
     public float Temperature;
     public float Volume;
     public int ParticleCount;
@@ -19,7 +18,6 @@ public struct Measurement
             KineticEnergy = this.KineticEnergy + m2.KineticEnergy,
             PotentialEnergy = this.PotentialEnergy + m2.PotentialEnergy,
             Pressure = this.Pressure + m2.Pressure,
-            VirialPressure = this.VirialPressure + m2.VirialPressure,
             Temperature = this.Temperature + m2.Temperature,
             Volume = m2.Volume,
             ParticleCount = m2.ParticleCount
@@ -33,20 +31,19 @@ public struct Measurement
             KineticEnergy = this.KineticEnergy / c,
             PotentialEnergy = this.PotentialEnergy / c,
             Pressure = this.Pressure / c,
-            VirialPressure = this.VirialPressure / c,
             Temperature = this.Temperature / c,
             Volume = this.Volume,
             ParticleCount = this.ParticleCount
         };
     }
 
-    public const string CsvHeader = "KineticEnergy;PotentialEnergy;Pressure;VirialPressure;Temperature;Volume;ParticleCount";
+    public const string CsvHeader = "KineticEnergy;PotentialEnergy;Pressure;Temperature;Volume;ParticleCount";
 
     public override string ToString()
     {
         return String.Format(
-            "Ekin = {0:G6} u·Å²/ps², Epot = {1:G6} u·Å²/ps², P = {2:G6} u/(Å·ps²), Pvirial = {3:G6} u/(Å·ps²), T = {4:G6} K, V = {5:G6} Å³, N = {6}",
-            KineticEnergy, PotentialEnergy, Pressure, VirialPressure, Temperature, Volume, ParticleCount);
+            "Ekin = {0:G6} u·Å²/ps², Epot = {1:G6} u·Å²/ps², P = {2:G6} u/(Å·ps²), T = {3:G6} K, V = {4:G6} Å³, N = {5}",
+            KineticEnergy, PotentialEnergy, Pressure, Temperature, Volume, ParticleCount);
     }
 
     public string ToCsvLine()
@@ -55,7 +52,6 @@ public struct Measurement
             KineticEnergy.ToString(CultureInfo.InvariantCulture),
             PotentialEnergy.ToString(CultureInfo.InvariantCulture),
             Pressure.ToString(CultureInfo.InvariantCulture),
-            VirialPressure.ToString(CultureInfo.InvariantCulture),
             Temperature.ToString(CultureInfo.InvariantCulture),
             Volume.ToString(CultureInfo.InvariantCulture),
             ParticleCount.ToString(CultureInfo.InvariantCulture));
@@ -115,8 +111,7 @@ public static class Experimenter
 
         return new Measurement
         {
-            Pressure = simulation.GetPressure(),
-            VirialPressure = simulation.GetVirialPressure(kineticEnergy),
+            Pressure = simulation.GetPressure(kineticEnergy),
             KineticEnergy = kineticEnergy,
             PotentialEnergy = simulation.GetTotalPotentialEnergy(),
             Temperature = simulation.GetTemperature(kineticEnergy),

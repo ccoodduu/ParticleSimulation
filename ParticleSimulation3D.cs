@@ -9,7 +9,6 @@ class ParticleSimulation3D
     public readonly SimulationParameters SimulationParameters;
     public int ParticleCount => SimulationParameters.ParticleCount;
     public Vector3 BoxSize => SimulationParameters.BoxSize;
-    public float BoxSurfaceArea => (BoxSize.X * BoxSize.Y + BoxSize.Y * BoxSize.Z + BoxSize.Z * BoxSize.X) * 2;
     public float BoxVolume => BoxSize.X * BoxSize.Y * BoxSize.Z;
 
     private readonly Random random;
@@ -24,8 +23,6 @@ class ParticleSimulation3D
     private readonly int gridCellsX, gridCellsY, gridCellsZ;
 
     private readonly Vector3 cellSize; // Størrelsen af hver celle i gitteret
-
-    private readonly Queue<float> pressureMeasurements = new();
 
     private float lastVirial;
 
@@ -46,10 +43,14 @@ class ParticleSimulation3D
         gridCellsZ = (int)MathF.Max(BoxSize.Z / minCellSize, 1);
         cellSize = BoxSize / new Vector3(gridCellsX, gridCellsY, gridCellsZ);
 
+        // Med færre end 3 celler ville den samme nabocelle blive besøgt flere gange, når gitteret wrapper rundt
+        if (gridCellsX < 3 || gridCellsY < 3 || gridCellsZ < 3)
+            throw new ArgumentException("Kassen skal være mindst 3 cutoff-afstande bred i hver retning.");
+
         gridHead = new int[gridCellsX * gridCellsY * gridCellsZ].Populate(-1);
         gridNext = new int[ParticleCount].Populate(-1);
 
-        // Spawn partiklerne i midten af hver celle i et 3D gitter, så de ikke overlapper hinanden og har lige stor afstand til alle vægge
+        // Spawn partiklerne i midten af hver celle i et 3D gitter, så de ikke overlapper hinanden
         int x = 0;
         int y = 0;
         int z = 0;
@@ -108,7 +109,7 @@ class ParticleSimulation3D
         float offset = LennardJones.CalculatePotentialEnergy(cutoff2, sigma2, ParticleParameters.Epsilon);
 
         float totalPotentialEnergy = 0f;
-        ForEachNeighborPair((i, j, d2) =>
+        ForEachNeighborPair((i, j, difference, d2) =>
         {
             totalPotentialEnergy += LennardJones.CalculatePotentialEnergyWithCutoff(d2, sigma2, ParticleParameters.Epsilon, cutoff2, offset);
         });
@@ -129,23 +130,43 @@ class ParticleSimulation3D
 
     public float GetPressure()
     {
-        if (pressureMeasurements.Count == 0) return 0f;
-        return pressureMeasurements.Average();
+        return GetPressure(GetTotalKineticEnergy());
     }
-
-    public float GetVirialPressure()
-    {
-        return GetVirialPressure(GetTotalKineticEnergy());
-    }
-    // P = (2K + Σ r_ij · F_ij) / (3V)
-    public float GetVirialPressure(float totalKineticEnergy)
+    // Virialtrykket: P = (2K + Σ r_ij · F_ij) / (3V)
+    public float GetPressure(float totalKineticEnergy)
     {
         return (2f * totalKineticEnergy + lastVirial) / (3f * BoxVolume);
     }
 
+    // Vektoren fra p2 til p1. Kassen har periodical boundaries, så den nærmeste kopi af p2 bruges (minimum image).
+    private Vector3 GetDisplacement(Vector3 p1, Vector3 p2)
+    {
+        var difference = p1 - p2;
+        difference.X = GetNearestImage(difference.X, BoxSize.X);
+        difference.Y = GetNearestImage(difference.Y, BoxSize.Y);
+        difference.Z = GetNearestImage(difference.Z, BoxSize.Z);
+        return difference;
+    }
+
+    // Begge partikler ligger i kassen, så afstanden er mindre end kassens bredde, og én forskydning er nok
+    private static float GetNearestImage(float difference, float boxLength)
+    {
+        if (difference > boxLength / 2) return difference - boxLength;
+        else if (difference < -boxLength / 2) return difference + boxLength;
+        else return difference;
+    }
+
+    // Gitteret wrapper rundt, fordi kassen har periodical boundaries. Nabocellen er højst én celle udenfor gitteret.
+    private static int GetNeighborCell(int cell, int cellCount)
+    {
+        if (cell < 0) return cell + cellCount;
+        else if (cell >= cellCount) return cell - cellCount;
+        else return cell;
+    }
+
     // Udfører funktionen `action` på hvert par af partikler, der er indenfor LennardJonesCutoff i gitteret.
     // Dette bruges til at beregne kræfter og potentielle energier mellem partiklerne.
-    private void ForEachNeighborPair(Action<int, int, float> action)
+    private void ForEachNeighborPair(Action<int, int, Vector3, float> action)
     {
         float cutoff2 = LennardJonesCutoff2;
 
@@ -158,19 +179,15 @@ class ParticleSimulation3D
 
             for (int zo = -1; zo <= 1; zo++)
             {
-                int neighborZ = z + zo;
-                if (neighborZ < 0 || neighborZ >= gridCellsZ) continue; // Skip celler udenfor gitteret
+                int neighborZ = GetNeighborCell(z + zo, gridCellsZ);
 
                 for (int yo = -1; yo <= 1; yo++)
                 {
-                    int neighborY = y + yo;
-                    if (neighborY < 0 || neighborY >= gridCellsY) continue; // Skip celler udenfor gitteret
+                    int neighborY = GetNeighborCell(y + yo, gridCellsY);
 
                     for (int xo = -1; xo <= 1; xo++)
                     {
-                        int neighborX = x + xo;
-
-                        if (neighborX < 0 || neighborX >= gridCellsX) continue; // Skip celler udenfor gitteret
+                        int neighborX = GetNeighborCell(x + xo, gridCellsX);
 
                         int currentNeighborIndex = neighborX + neighborY * gridCellsX + neighborZ * gridCellsX * gridCellsY;
                         int currentNeighborParticleIndex = gridHead[currentNeighborIndex];
@@ -181,13 +198,14 @@ class ParticleSimulation3D
 
                             if (j <= i) continue; // Skip sig selv eller partikler der allerede er blevet behandlet for at undgå dobbelttælling
 
-                            float d2 = Vector3.DistanceSquared(particles[i].Position, particles[j].Position);
+                            var difference = GetDisplacement(particles[i].Position, particles[j].Position);
+                            float d2 = difference.LengthSquared();
                             if (d2 > cutoff2)
                             {
                                 continue; // Spring over hvis partiklerne er langt fra hinanden, da det giver en kraft der nærmest er 0
                             }
 
-                            action(i, j, d2); // Udfør handlingen på partikelparret
+                            action(i, j, difference, d2); // Udfør handlingen på partikelparret
                         }
                     }
                 }
@@ -205,14 +223,11 @@ class ParticleSimulation3D
             gridHead[gridIndex] = -1; // Reset cellen, dette resetter alle celler med partikler i, alle andre er allerede sat til -1, så det er ikke nødvendigt at sætte dem igen
         }
 
-        float totalVelocityChange = 0f;
-
         for (int i = 0; i < particles.Length; i++)
         {
             particles[i].ApplyHalfAcceleration(SimulationParameters.TimePerStepPs); // Velocity Verlet integration
 
-            float velocityChange = particles[i].Update(BoxSize, SimulationParameters.TimePerStepPs); // Flytter partiklerne og håndterer kollisioner med væggene
-            totalVelocityChange += velocityChange;
+            particles[i].Update(BoxSize, SimulationParameters.TimePerStepPs);
 
             particles[i].ResetAcceleration(); // Nulstil acceleration efter opdatering, så den ikke akkumuleres over tid
 
@@ -222,18 +237,14 @@ class ParticleSimulation3D
             gridNext[i] = currentHead; // Sæt partiklen til at pege på den tidligere første partikel i cellen
         }
 
-        float pressure = totalVelocityChange * ParticleParameters.Mass / BoxSurfaceArea / SimulationParameters.TimePerStepPs; // Enheden er u*(Å/ps^2), hvilket er en enhed for tryk.
-        pressureMeasurements.Enqueue(pressure);
-        if (pressureMeasurements.Count > 10000) pressureMeasurements.Dequeue();
-
         // Loop igennem alle par af partikler og beregn kraften mellem dem
         float virial = 0f;
-        ForEachNeighborPair((i, j, d2) =>
+        ForEachNeighborPair((i, j, difference, d2) =>
         {
-            var force = LennardJones.CalculateForce(particles[i].Position, particles[j].Position, sigma2, ParticleParameters.Epsilon);
+            var force = LennardJones.CalculateForce(difference, sigma2, ParticleParameters.Epsilon);
             particles[i].ApplyForce(force, ParticleParameters.Mass);
             particles[j].ApplyForce(-force, ParticleParameters.Mass);
-            virial += Vector3.Dot(particles[i].Position - particles[j].Position, force);
+            virial += Vector3.Dot(difference, force);
         });
         lastVirial = virial;
 

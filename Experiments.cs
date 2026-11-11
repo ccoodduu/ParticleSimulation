@@ -58,43 +58,71 @@ public static class Experiments
         new(0.90f, 0.009f, -8.9936e-02f, 7.6363e-03f),
     ];
 
+    // NIST LJ_PURE, NVE molekylær dynamik, væske-tilstande: https://mmlapps.nist.gov/srs/LJ_PURE/md.htm
+    private static readonly NistReference[] NistLiquidReferences =
+    [
+        new(0.851f, 0.776f, -5.517f, 0.030f),
+        new(0.853f, 0.780f, -5.533f, 0.072f),
+        new(0.852f, 0.820f, -5.803f, 0.573f),
+        new(0.851f, 0.840f, -5.909f, 0.910f),
+        new(0.849f, 0.860f, -6.027f, 1.282f),
+        new(0.851f, 0.900f, -6.234f, 2.544f),
+    ];
+
     public static void NistVaporExperiment()
     {
-        const int particleCount = 1000;
-        const float temperatureTolerance = 0.003f;
-        const int maxAttempts = 4;
-
-        var particleParameters = ParticleParameters.Argon;
         var measurementSettings = new MeasurementSettings
         {
             StepToMeasureAt = 500000,
             StepsToAverageOver = 500000
         };
+        RunNistComparison(NistVaporReferences, measurementSettings, 0.003f, "nist_vapor_experiment.csv");
+    }
 
-        var lines = new string[NistVaporReferences.Length];
-
-        Parallel.For(0, NistVaporReferences.Length, i =>
+    public static void NistLiquidExperiment()
+    {
+        var measurementSettings = new MeasurementSettings
         {
-            var reference = NistVaporReferences[i];
-            float boxSide = MathF.Cbrt(particleCount / reference.Density) * particleParameters.Sigma;
+            StepToMeasureAt = 50000,
+            StepsToAverageOver = 50000
+        };
+        RunNistComparison(NistLiquidReferences, measurementSettings, 0.002f, "nist_liquid_experiment.csv");
+    }
 
-            // Startgitteret har U = 0, så energibevarelse giver (3/2)T*₀ = (3/2)T* + U*
-            float startTemperature = reference.Temperature + 2f / 3f * reference.PotentialEnergy;
+    private static void RunNistComparison(NistReference[] references, MeasurementSettings measurementSettings, float temperatureTolerance, string path)
+    {
+        const int particleCount = 1000;
+        const int maxAttempts = 4;
+
+        var particleParameters = ParticleParameters.Argon;
+
+        var lines = new string[references.Length];
+
+        Parallel.For(0, references.Length, i =>
+        {
+            var reference = references[i];
+            float boxSide = MathF.Cbrt(particleCount / reference.Density) * particleParameters.Sigma;
+            var latticeParameters = new SimulationParameters(particleCount, new Vector3(boxSide), 0f);
+            float cutoff = latticeParameters.LennardJonesCutoffMultiplier;
+
+            // Energibevarelse fra startgitteret: (3/2)T*₀ + U*₀ = (3/2)T* + U*
+            float latticePotentialEnergy = new ParticleSimulation3D(latticeParameters, particleParameters).GetTotalPotentialEnergy() / (particleCount * particleParameters.Epsilon);
+            float expectedPotentialEnergy = reference.PotentialEnergy + ExpectedPotentialEnergyDeviation(reference.Density, cutoff);
+            float startTemperature = reference.Temperature + 2f / 3f * (expectedPotentialEnergy - latticePotentialEnergy);
 
             for (int attempt = 1; ; attempt++)
             {
                 float startVelocity = MathF.Sqrt(3f * startTemperature * particleParameters.Epsilon / particleParameters.Mass);
-                var simulationParameters = new SimulationParameters(particleCount, new Vector3(boxSide), startVelocity);
+                var simulationParameters = latticeParameters with { ParticleStartVelocity = startVelocity };
 
                 var measurement = Experimenter.RunExperiment(simulationParameters, particleParameters, measurementSettings);
 
                 float temperature = measurement.Temperature * (float)Units.BoltzmannConstant / particleParameters.Epsilon;
                 float potentialEnergy = measurement.PotentialEnergy / (particleCount * particleParameters.Epsilon);
                 float pressure = measurement.Pressure * MathF.Pow(particleParameters.Sigma, 3) / particleParameters.Epsilon;
-                float virialPressure = measurement.VirialPressure * MathF.Pow(particleParameters.Sigma, 3) / particleParameters.Epsilon;
                 float temperatureError = temperature - reference.Temperature;
 
-                Console.WriteLine($"T* = {reference.Temperature}, ρ* = {reference.Density}, forsøg {attempt}: v0 = {startVelocity:F4} Å/ps, målt T* = {temperature:F4}, U* = {potentialEnergy:G5} (NIST {reference.PotentialEnergy:G5}), p* = {pressure:G5}, virial p* = {virialPressure:G5} (NIST {reference.Pressure:G5})");
+                Console.WriteLine($"T* = {reference.Temperature}, ρ* = {reference.Density}, forsøg {attempt}: v0 = {startVelocity:F4} Å/ps, målt T* = {temperature:F4}, U* = {potentialEnergy:G5} (NIST {reference.PotentialEnergy:G5}), p* = {pressure:G5} (NIST {reference.Pressure:G5})");
 
                 if (MathF.Abs(temperatureError) > temperatureTolerance && attempt < maxAttempts)
                 {
@@ -102,14 +130,13 @@ public static class Experiments
                     continue;
                 }
 
-                float cutoff = simulationParameters.LennardJonesCutoffMultiplier;
                 float expectedPotentialEnergyDeviation = ExpectedPotentialEnergyDeviation(reference.Density, cutoff);
                 float expectedPressureDeviation = ExpectedPressureDeviation(reference.Density, cutoff);
 
                 lines[i] = string.Join(';', new float[]
                 {
                     reference.Temperature, reference.Density, particleCount, boxSide, startVelocity, attempt,
-                    temperature, potentialEnergy, pressure, virialPressure,
+                    temperature, potentialEnergy, pressure,
                     reference.PotentialEnergy, reference.Pressure,
                     potentialEnergy - reference.PotentialEnergy, expectedPotentialEnergyDeviation,
                     pressure - reference.Pressure, expectedPressureDeviation,
@@ -118,9 +145,8 @@ public static class Experiments
             }
         });
 
-        const string header = "TargetT;Density;ParticleCount;BoxSideAngstrom;StartVelocity;Attempts;T;U;P;VirialP;NistU;NistP;UDeviation;ExpectedUDeviation;PDeviation;ExpectedPDeviation";
+        const string header = "TargetT;Density;ParticleCount;BoxSideAngstrom;StartVelocity;Attempts;T;U;P;NistU;NistP;UDeviation;ExpectedUDeviation;PDeviation;ExpectedPDeviation";
 
-        const string path = "nist_vapor_experiment.csv";
         File.WriteAllLines(path, lines.Prepend(header));
         Console.WriteLine($"Resultater gemt i {Path.GetFullPath(path)}");
     }

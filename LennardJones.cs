@@ -14,7 +14,10 @@ static class LennardJones
     // Hvilket er smart fordi det er billigere at beregne r^2 end r.
     public static Vector3 CalculateForce(Vector3 p1, Vector3 p2, float sigma2, float epsilon)
     {
-        Vector3 difference = p1 - p2;
+        return CalculateForce(p1 - p2, sigma2, epsilon);
+    }
+    public static Vector3 CalculateForce(Vector3 difference, float sigma2, float epsilon)
+    {
         float distance2 = difference.LengthSquared(); // Beregn afstanden i anden mellem de to partikler (r^2). Afstanden kaldes ofte r i formlen for Lennard-Jones potentialet.
 
         float sigmaOverR2 = sigma2 / distance2;
