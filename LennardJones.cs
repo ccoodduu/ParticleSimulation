@@ -50,6 +50,10 @@ static class LennardJones
         return potentialEnergy;
     }
 
+    // Når vi bruger en cutoff distance, skal vi også tage højde for at potentialet ikke går til nul ved cutoff.
+    // Derfor beregner vi offsettet som potentialet ved cutoff og trækker det fra potentialet mellem de to partikler.
+    // Dette giver ikke en realistisk potentiel energi, men det er den der skal bruges for at opfylde energibevarelse i simulationen,
+    // ellers vil der brat forsvinde eller opstå energi det moment 2 partikler bevæger sig ind eller uden for cutoff.
     public static float CalculatePotentialEnergyWithCutoff(Vector3 p1, Vector3 p2, float sigma2, float epsilon, float cutoff2)
     {
         float offset = CalculatePotentialEnergy(cutoff2, sigma2, epsilon);
@@ -73,6 +77,40 @@ static class LennardJones
         float potentialEnergy = 4 * epsilon * (sigmaOverR12 - sigmaOverR6);
 
         return potentialEnergy - offset;
+    }
+
+    // Long-range correction
+    // Med en cutoff distance bliver der ikke taget højde for partikler der er længere væk end cutoff.
+    // Det er især et problem for den potentielle energi og trykket ved høj densitet.
+    // Trykket bliver for højt, da partiklerne holder for lidt sammen på hinanden, grundet manglende tiltrækning fra partiklerne længere væk.
+    // Derfor er trykket fra virialet for højt.
+    // Den potentielle energi bliver for høj, fordi der er en negativ energi i tiltrækningen til partiklerne længere væk, som ikke tages højde for.
+    // Energien fra tiltrækningen er negativ, fordi det kræver energi at trække partiklerne fra hinanden, og U er 0, når de er uendeligt langt fra hinanden.
+
+    // For at rette op på dette kan man lave en long-range correction, som er en analytisk beregning af den potentielle energi og trykket fra partiklerne længere væk end cutoff.
+    // Den antager at partiklerne længere væk end cutoff er jævnt fordelt med en densitet ρ.
+    // Ved at integrere Lennard-Jones potentialet fra cutoff til uendelig kan man beregne den potentielle energi og trykket fra partiklerne længere væk end cutoff.
+
+    // Det giver følgende formler:
+    // U_LRC = 8/3 * pi * density * epsilon * sigma^3 * ( 1/3 * (sigma / cutoff)^9 - (sigma / cutoff)^3 )
+    // Dette er den potentielle energi per partikel, som skal lægges til den beregnede potentielle energi for at få den korrekte totale potentielle energi.
+    public static float CalculateEnergyCorrectionPerParticle(float density, float sigma, float epsilon, float cutoff)
+    {
+        float sigma3 = sigma * sigma * sigma;
+        float sigmaOverCutoff3 = sigma3 / (cutoff * cutoff * cutoff);
+        float sigmaOverCutoff9 = sigmaOverCutoff3 * sigmaOverCutoff3 * sigmaOverCutoff3;
+
+        return 8f / 3f * MathF.PI * density * epsilon * sigma3 * (sigmaOverCutoff9 / 3f - sigmaOverCutoff3);
+    }
+
+    // P_LRC = 16/3 * pi * density^2 * epsilon * sigma^3 * (2/3 * (sigma/cutoff)^9 - (sigma/cutoff)^3)
+    public static float CalculatePressureCorrection(float density, float sigma, float epsilon, float cutoff)
+    {
+        float sigma3 = sigma * sigma * sigma;
+        float sigmaOverCutoff3 = sigma3 / (cutoff * cutoff * cutoff);
+        float sigmaOverCutoff9 = sigmaOverCutoff3 * sigmaOverCutoff3 * sigmaOverCutoff3;
+
+        return 16f / 3f * MathF.PI * density * density * epsilon * sigma3 * (2f / 3f * sigmaOverCutoff9 - sigmaOverCutoff3);
     }
 
     public static float GetCutoffDistance(float sigma, float scalar)

@@ -89,6 +89,102 @@ public static class Experiments
         RunNistComparison(NistLiquidReferences, measurementSettings, 0.002f, "nist_liquid_experiment.csv");
     }
 
+    private readonly record struct ArgonReference(float Temperature, float Pressure, float Density);
+
+    // NIST Chemistry WebBook, isotermer for argon (Temperature K, Pressure bar, Density mol/l): ../NIST/argon 180K.csv og argon 300K.csv
+    private static readonly ArgonReference[] ArgonReferences =
+    [
+        new(180f, 1.0000f, 0.067088f),
+        new(180f, 49.285f, 4.2262f),
+        new(180f, 99.235f, 12.172f),
+        new(180f, 149.19f, 18.503f),
+        new(180f, 199.13f, 21.378f),
+        new(180f, 249.09f, 23.152f),
+        new(180f, 300.70f, 24.481f),
+        new(180f, 400.60f, 26.340f),
+        new(180f, 500.50f, 27.706f),
+        new(180f, 600.40f, 28.796f),
+        new(180f, 800.20f, 30.500f),
+        new(180f, 1000.0f, 31.825f),
+        new(300f, 1.0000f, 0.040115f),
+        new(300f, 49.285f, 2.0294f),
+        new(300f, 99.235f, 4.1626f),
+        new(300f, 149.19f, 6.3038f),
+        new(300f, 199.13f, 8.3722f),
+        new(300f, 249.09f, 10.300f),
+        new(300f, 300.70f, 12.103f),
+        new(300f, 400.60f, 15.038f),
+        new(300f, 500.50f, 17.352f),
+        new(300f, 600.40f, 19.212f),
+        new(300f, 800.20f, 22.045f),
+        new(300f, 1000.0f, 24.152f),
+    ];
+
+    public static void ArgonIsothermExperiment()
+    {
+        const int particleCount = 1000;
+        const int maxAttempts = 5;
+        const float temperatureTolerance = 1f; // K
+        const double avogadroConstant = 6.02214076e23;
+
+        var particleParameters = ParticleParameters.Argon;
+        var measurementSettings = new MeasurementSettings
+        {
+            StepToMeasureAt = 50000,
+            StepsToAverageOver = 100000
+        };
+
+        var lines = new string[ArgonReferences.Length];
+
+        Parallel.For(0, ArgonReferences.Length, i =>
+        {
+            var reference = ArgonReferences[i];
+
+            // mol/l -> partikler pr. Å³
+            float numberDensity = (float)(reference.Density * 1000 * avogadroConstant * Math.Pow(Units.MeterPerAngstrom, 3));
+            float boxSide = MathF.Cbrt(particleCount / numberDensity);
+
+            float startTemperature = reference.Temperature;
+            for (int attempt = 1; ; attempt++)
+            {
+                float startVelocity = MathF.Sqrt(3f * (float)Units.BoltzmannConstant * startTemperature / particleParameters.Mass);
+                var simulationParameters = new SimulationParameters(particleCount, new Vector3(boxSide), startVelocity);
+
+                var measurement = Experimenter.RunExperiment(simulationParameters, particleParameters, measurementSettings);
+
+                float pressure = (float)(measurement.Pressure * Units.PascalPerPressureUnit / 1e5); // bar
+                float temperatureError = measurement.Temperature - reference.Temperature;
+
+                Console.WriteLine($"T = {reference.Temperature} K, NIST p = {reference.Pressure} bar, forsøg {attempt}: målt T = {measurement.Temperature:F2} K, p = {pressure:G5} bar");
+
+                if (MathF.Abs(temperatureError) > temperatureTolerance && attempt < maxAttempts)
+                {
+                    startTemperature -= temperatureError;
+                    continue;
+                }
+
+                // Z = p / (n k T), hvor n er antal partikler pr. volumen
+                float idealPressure = (float)(numberDensity * Units.BoltzmannConstant * measurement.Temperature * Units.PascalPerPressureUnit / 1e5);
+                float nistIdealPressure = (float)(numberDensity * Units.BoltzmannConstant * reference.Temperature * Units.PascalPerPressureUnit / 1e5);
+
+                lines[i] = string.Join(';', new float[]
+                {
+                    reference.Temperature, reference.Density, numberDensity * MathF.Pow(particleParameters.Sigma, 3), boxSide, attempt,
+                    measurement.Temperature, pressure, reference.Pressure,
+                    pressure / idealPressure, reference.Pressure / nistIdealPressure,
+                    (pressure - reference.Pressure) / reference.Pressure,
+                }.Select(v => v.ToString(CultureInfo.InvariantCulture)));
+                break;
+            }
+        });
+
+        const string header = "TargetT;DensityMolPerL;ReducedDensity;BoxSideAngstrom;Attempts;T;P;NistP;Z;NistZ;PRelativeDeviation";
+        const string path = "argon_isotherm_experiment.csv";
+
+        File.WriteAllLines(path, lines.Prepend(header));
+        Console.WriteLine($"Resultater gemt i {Path.GetFullPath(path)}");
+    }
+
     private static void RunNistComparison(NistReference[] references, MeasurementSettings measurementSettings, float temperatureTolerance, string path)
     {
         const int particleCount = 1000;
@@ -103,12 +199,10 @@ public static class Experiments
             var reference = references[i];
             float boxSide = MathF.Cbrt(particleCount / reference.Density) * particleParameters.Sigma;
             var latticeParameters = new SimulationParameters(particleCount, new Vector3(boxSide), 0f);
-            float cutoff = latticeParameters.LennardJonesCutoffMultiplier;
 
             // Energibevarelse fra startgitteret: (3/2)T*₀ + U*₀ = (3/2)T* + U*
-            float latticePotentialEnergy = new ParticleSimulation3D(latticeParameters, particleParameters).GetTotalPotentialEnergy() / (particleCount * particleParameters.Epsilon);
-            float expectedPotentialEnergy = reference.PotentialEnergy + ExpectedPotentialEnergyDeviation(reference.Density, cutoff);
-            float startTemperature = reference.Temperature + 2f / 3f * (expectedPotentialEnergy - latticePotentialEnergy);
+            float latticePotentialEnergy = new ParticleSimulation3D(latticeParameters, particleParameters).GetCorrectedPotentialEnergy() / (particleCount * particleParameters.Epsilon);
+            float startTemperature = reference.Temperature + 2f / 3f * (reference.PotentialEnergy - latticePotentialEnergy);
 
             for (int attempt = 1; ; attempt++)
             {
@@ -130,40 +224,20 @@ public static class Experiments
                     continue;
                 }
 
-                float expectedPotentialEnergyDeviation = ExpectedPotentialEnergyDeviation(reference.Density, cutoff);
-                float expectedPressureDeviation = ExpectedPressureDeviation(reference.Density, cutoff);
-
                 lines[i] = string.Join(';', new float[]
                 {
                     reference.Temperature, reference.Density, particleCount, boxSide, startVelocity, attempt,
                     temperature, potentialEnergy, pressure,
                     reference.PotentialEnergy, reference.Pressure,
-                    potentialEnergy - reference.PotentialEnergy, expectedPotentialEnergyDeviation,
-                    pressure - reference.Pressure, expectedPressureDeviation,
+                    potentialEnergy - reference.PotentialEnergy, pressure - reference.Pressure,
                 }.Select(v => v.ToString(CultureInfo.InvariantCulture)));
                 break;
             }
         });
 
-        const string header = "TargetT;Density;ParticleCount;BoxSideAngstrom;StartVelocity;Attempts;T;U;P;NistU;NistP;UDeviation;ExpectedUDeviation;PDeviation;ExpectedPDeviation";
+        const string header = "TargetT;Density;ParticleCount;BoxSideAngstrom;StartVelocity;Attempts;T;U;P;NistU;NistP;UDeviation;PDeviation";
 
         File.WriteAllLines(path, lines.Prepend(header));
         Console.WriteLine($"Resultater gemt i {Path.GetFullPath(path)}");
-    }
-
-    // Simuleringen bruger et shiftet potentiale uden long-range correction (LRC), mens NIST bruger et ushiftet potentiale med LRC.
-    // Antager g(r) = 1 inden for cutoff, så hver partikel har ½ρ(4/3)πr_c³ naboer, der hver løftes med -U(r_c).
-    private static float ExpectedPotentialEnergyDeviation(float density, float cutoff)
-    {
-        float cutoffPotential = 4f * (MathF.Pow(cutoff, -12) - MathF.Pow(cutoff, -6));
-        float shift = -cutoffPotential * 2f / 3f * MathF.PI * MathF.Pow(cutoff, 3) * density;
-        float longRangeCorrection = 8f / 3f * MathF.PI * density * (MathF.Pow(cutoff, -9) / 3f - MathF.Pow(cutoff, -3));
-        return shift - longRangeCorrection;
-    }
-
-    private static float ExpectedPressureDeviation(float density, float cutoff)
-    {
-        float longRangeCorrection = 16f / 3f * MathF.PI * density * density * (2f / 3f * MathF.Pow(cutoff, -9) - MathF.Pow(cutoff, -3));
-        return -longRangeCorrection;
     }
 }

@@ -14,6 +14,12 @@ if (args.Contains("--nist-vapor"))
     return;
 }
 
+if (args.Contains("--argon"))
+{
+    Experiments.ArgonIsothermExperiment();
+    return;
+}
+
 if (args.Contains("--experiment"))
 {
     Experiments.StartVelocityExperiment();

@@ -111,9 +111,9 @@ public static class Experimenter
 
         return new Measurement
         {
-            Pressure = simulation.GetPressure(kineticEnergy),
+            Pressure = simulation.GetCorrectedPressure(kineticEnergy),
             KineticEnergy = kineticEnergy,
-            PotentialEnergy = simulation.GetTotalPotentialEnergy(),
+            PotentialEnergy = simulation.GetCorrectedPotentialEnergy(),
             Temperature = simulation.GetTemperature(kineticEnergy),
             Volume = simulation.BoxVolume,
             ParticleCount = simulation.ParticleCount

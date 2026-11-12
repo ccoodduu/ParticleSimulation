@@ -10,6 +10,7 @@ class ParticleSimulation3D
     public int ParticleCount => SimulationParameters.ParticleCount;
     public Vector3 BoxSize => SimulationParameters.BoxSize;
     public float BoxVolume => BoxSize.X * BoxSize.Y * BoxSize.Z;
+    public float Density => ParticleCount / BoxVolume; // Partikler pr. volumen
 
     private readonly Random random;
 
@@ -101,6 +102,9 @@ class ParticleSimulation3D
         return totalKineticEnergy;
     }
 
+    // Den totale potentielle energi af simuleringen. Den er for høj ift. virkeligheden, fordi den ikke tager højde for partikler udenfor cutoff-afstanden,
+    // og energien er blevet offset for at den er 0 ved cutoff.
+    // Dette sørger for energibevarelse i simuleringen, men giver ikke den rigtige værdi for den potentielle energi.
     public float GetTotalPotentialEnergy()
     {
         float cutoff2 = LennardJonesCutoff2;
@@ -115,6 +119,23 @@ class ParticleSimulation3D
         });
 
         return totalPotentialEnergy;
+    }
+
+    // Den korrigerede potentielle energi af simuleringen. Den tager højde for partikler udenfor cutoff-afstanden, og er ikke offset, og giver derfor en mere realistisk værdi for den potentielle energi.
+    // Hvis denne bruges til at udregne den totale energi, vil energien ikke længere være bevaret, fordi hver partikels potentielle energi ikke er offset.
+    // Dette er samme konvention som NIST's tabeller.
+    public float GetCorrectedPotentialEnergy()
+    {
+        float sigma2 = ParticleParameters.Sigma * ParticleParameters.Sigma;
+
+        float totalPotentialEnergy = 0f;
+        ForEachNeighborPair((i, j, difference, d2) =>
+        {
+            totalPotentialEnergy += LennardJones.CalculatePotentialEnergy(d2, sigma2, ParticleParameters.Epsilon);
+        });
+
+        float longRangeCorrection = ParticleCount * LennardJones.CalculateEnergyCorrectionPerParticle(Density, ParticleParameters.Sigma, ParticleParameters.Epsilon, LennardJonesCutoff);
+        return totalPotentialEnergy + longRangeCorrection;
     }
 
     public float GetTemperature()
@@ -132,10 +153,24 @@ class ParticleSimulation3D
     {
         return GetPressure(GetTotalKineticEnergy());
     }
-    // Virialtrykket: P = (2K + Σ r_ij · F_ij) / (3V)
+
+    // Virial-trykket er en måde at beregne trykket i en simulering ud fra alle partiklerne, uden at have en væg at måle det på.
+    // Kilde: Gould, Tobochnik og Christian, "An Introduction to Computer Simulation Methods", 3rd edition, afsnit 8.7 formel 8.8
+    // P*V = NkT + 1/3 * sum(r_ij * F_ij)
+    // Temperatur er defineret som T = 2/3 * (E_kin / Nk) sat ind og isoleret for trykket giver det:
+    // P = (2 * E_kin + sum(r_ij * F_ij)) / (3 * V)
+    // Summen udregnes i Update() metoden, og gemmes i lastVirial, så den ikke skal udregnes igen her.
     public float GetPressure(float totalKineticEnergy)
     {
         return (2f * totalKineticEnergy + lastVirial) / (3f * BoxVolume);
+    }
+
+    // Trykket plus long-range correction. Giver mere realistiske værdier, da den tager højde for partikler udenfor cutoff-afstanden.
+    // Samme konvention som NIST's tabeller
+    public float GetCorrectedPressure(float totalKineticEnergy)
+    {
+        float longRangeCorrection = LennardJones.CalculatePressureCorrection(Density, ParticleParameters.Sigma, ParticleParameters.Epsilon, LennardJonesCutoff);
+        return GetPressure(totalKineticEnergy) + longRangeCorrection;
     }
 
     // Vektoren fra p2 til p1. Kassen har periodical boundaries, så den nærmeste kopi af p2 bruges (minimum image).
