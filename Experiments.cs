@@ -5,239 +5,241 @@ namespace ParticleSimulation;
 
 public static class Experiments
 {
-    public static void StartVelocityExperiment()
+    // Et forsøg ved en bestemt temperatur (K) og tæthed (partikler pr. Å³)
+    private readonly record struct Condition(float Temperature, float NumberDensity);
+
+    // Tætheden i mol/l, som i NIST's filer
+    private static Condition FromMolPerLiter(float temperature, float molPerLiter)
     {
-        float[] startVelocities = [2f, 3f, 4f, 5f, 6f]; // Å/ps
-
-        var simulationParameters = new SimulationParameters(1000, new Vector3(100), startVelocities[0]);
-        var measurementSettings = new MeasurementSettings
-        {
-            StepToMeasureAt = 20000,
-            StepsToAverageOver = 10000
-        };
-
-        var measurements = Experimenter.RunExperiments(
-            simulationParameters,
-            ParticleParameters.Argon,
-            measurementSettings,
-            (sp, pp, ms, i) =>
-            {
-                sp.ParticleStartVelocity = startVelocities[i];
-                Console.WriteLine($"Kører forsøg {i + 1}/{startVelocities.Length} (v0 = {startVelocities[i]} Å/ps)...");
-                return (sp, pp, ms);
-            },
-            startVelocities.Length);
-
-        var lines = new List<string> { "StartVelocity;" + Measurement.CsvHeader };
-        for (int i = 0; i < measurements.Length; i++)
-        {
-            Console.WriteLine($"v0 = {startVelocities[i]} Å/ps: {measurements[i]}");
-            lines.Add(startVelocities[i].ToString(CultureInfo.InvariantCulture) + ";" + measurements[i].ToCsvLine());
-        }
-
-        const string path = "startvelocity_experiment.csv";
-        File.WriteAllLines(path, lines);
-        Console.WriteLine($"Resultater gemt i {Path.GetFullPath(path)}");
+        return new(temperature, (float)(molPerLiter * 1000 * Units.AvogadroConstant * Math.Pow(Units.MeterPerAngstrom, 3)));
     }
 
-    // Reducerede enheder: T* = kT/ε, ρ* = ρσ³, U* = U/(Nε), p* = pσ³/ε
-    private readonly record struct NistReference(float Temperature, float Density, float PotentialEnergy, float Pressure);
+    // Reducerede enheder, som i NIST LJ_PURE: T* = kT/ε, ρ* = ρσ³
+    private static Condition FromReducedUnits(float reducedTemperature, float reducedDensity)
+    {
+        var argon = ParticleParameters.Argon;
+        return new(reducedTemperature * argon.Epsilon / (float)Units.BoltzmannConstant, reducedDensity / (argon.Sigma * argon.Sigma * argon.Sigma));
+    }
 
     // NIST LJ_PURE, NVT Monte Carlo, damp-tilstande: https://mmlapps.nist.gov/srs/LJ_PURE/mc.htm
-    private static readonly NistReference[] NistVaporReferences =
+    private static readonly Condition[] NistVaporConditions =
     [
-        new(0.85f, 0.001f, -1.0317e-02f, 8.4402e-04f),
-        new(0.85f, 0.003f, -3.1019e-02f, 2.4965e-03f),
-        new(0.85f, 0.005f, -5.1901e-02f, 4.1003e-03f),
-        new(0.85f, 0.007f, -7.2834e-02f, 5.6565e-03f),
-        new(0.85f, 0.009f, -9.3973e-02f, 7.1641e-03f),
-        new(0.90f, 0.001f, -9.9165e-03f, 8.9429e-04f),
-        new(0.90f, 0.003f, -2.9787e-02f, 2.6485e-03f),
-        new(0.90f, 0.005f, -4.9771e-02f, 4.3569e-03f),
-        new(0.90f, 0.007f, -6.9805e-02f, 6.0193e-03f),
-        new(0.90f, 0.009f, -8.9936e-02f, 7.6363e-03f),
+        FromReducedUnits(0.85f, 0.001f),
+        FromReducedUnits(0.85f, 0.003f),
+        FromReducedUnits(0.85f, 0.005f),
+        FromReducedUnits(0.85f, 0.007f),
+        FromReducedUnits(0.85f, 0.009f),
+        FromReducedUnits(0.90f, 0.001f),
+        FromReducedUnits(0.90f, 0.003f),
+        FromReducedUnits(0.90f, 0.005f),
+        FromReducedUnits(0.90f, 0.007f),
+        FromReducedUnits(0.90f, 0.009f),
     ];
 
-    // NIST LJ_PURE, NVE molekylær dynamik, væske-tilstande: https://mmlapps.nist.gov/srs/LJ_PURE/md.htm
-    private static readonly NistReference[] NistLiquidReferences =
+    // NIST Chemistry WebBook, isotermer for helium: ../NIST/helium 180K.csv og helium 300K.csv
+    private static readonly Condition[] HeliumConditions =
     [
-        new(0.851f, 0.776f, -5.517f, 0.030f),
-        new(0.853f, 0.780f, -5.533f, 0.072f),
-        new(0.852f, 0.820f, -5.803f, 0.573f),
-        new(0.851f, 0.840f, -5.909f, 0.910f),
-        new(0.849f, 0.860f, -6.027f, 1.282f),
-        new(0.851f, 0.900f, -6.234f, 2.544f),
+        FromMolPerLiter(180f, 0.066764f),
+        FromMolPerLiter(180f, 0.61838f),
+        FromMolPerLiter(180f, 1.2706f),
+        FromMolPerLiter(180f, 3.1665f),
+        FromMolPerLiter(180f, 6.1388f),
+        FromMolPerLiter(180f, 8.9012f),
+        FromMolPerLiter(180f, 11.561f),
+        FromMolPerLiter(180f, 13.968f),
+        FromMolPerLiter(180f, 16.229f),
+        FromMolPerLiter(180f, 20.374f),
+        FromMolPerLiter(180f, 24.093f),
+        FromMolPerLiter(180f, 27.460f),
+        FromMolPerLiter(180f, 33.355f),
+        FromMolPerLiter(180f, 38.397f),
+        FromMolPerLiter(300f, 0.040072f),
+        FromMolPerLiter(300f, 0.37220f),
+        FromMolPerLiter(300f, 0.76734f),
+        FromMolPerLiter(300f, 1.9310f),
+        FromMolPerLiter(300f, 3.8014f),
+        FromMolPerLiter(300f, 5.5918f),
+        FromMolPerLiter(300f, 7.3642f),
+        FromMolPerLiter(300f, 9.0101f),
+        FromMolPerLiter(300f, 10.593f),
+        FromMolPerLiter(300f, 13.585f),
+        FromMolPerLiter(300f, 16.372f),
+        FromMolPerLiter(300f, 18.979f),
+        FromMolPerLiter(300f, 23.732f),
+        FromMolPerLiter(300f, 27.972f),
+    ];
+
+    // NIST Chemistry WebBook, isotermer for neon: ../NIST/neon 180K.csv og neon 300K.csv
+    private static readonly Condition[] NeonConditions =
+    [
+        FromMolPerLiter(180f, 0.066787f),
+        FromMolPerLiter(180f, 0.62034f),
+        FromMolPerLiter(180f, 1.2787f),
+        FromMolPerLiter(180f, 3.2136f),
+        FromMolPerLiter(180f, 6.2943f),
+        FromMolPerLiter(180f, 9.1813f),
+        FromMolPerLiter(180f, 11.957f),
+        FromMolPerLiter(180f, 14.449f),
+        FromMolPerLiter(180f, 16.764f),
+        FromMolPerLiter(180f, 20.909f),
+        FromMolPerLiter(180f, 24.492f),
+        FromMolPerLiter(180f, 27.612f),
+        FromMolPerLiter(180f, 32.799f),
+        FromMolPerLiter(180f, 36.985f),
+        FromMolPerLiter(300f, 0.040072f),
+        FromMolPerLiter(300f, 0.37223f),
+        FromMolPerLiter(300f, 0.76745f),
+        FromMolPerLiter(300f, 1.9313f),
+        FromMolPerLiter(300f, 3.7998f),
+        FromMolPerLiter(300f, 5.5821f),
+        FromMolPerLiter(300f, 7.3368f),
+        FromMolPerLiter(300f, 8.9546f),
+        FromMolPerLiter(300f, 10.498f),
+        FromMolPerLiter(300f, 13.380f),
+        FromMolPerLiter(300f, 16.019f),
+        FromMolPerLiter(300f, 18.444f),
+        FromMolPerLiter(300f, 22.750f),
+        FromMolPerLiter(300f, 26.458f),
+    ];
+
+    // NIST Chemistry WebBook, isotermer for argon: ../NIST/argon 180K.csv og argon 300K.csv
+    private static readonly Condition[] ArgonConditions =
+    [
+        FromMolPerLiter(180f, 0.067088f),
+        FromMolPerLiter(180f, 0.64779f),
+        FromMolPerLiter(180f, 1.4039f),
+        FromMolPerLiter(180f, 4.2262f),
+        FromMolPerLiter(180f, 12.172f),
+        FromMolPerLiter(180f, 18.503f),
+        FromMolPerLiter(180f, 21.449f),
+        FromMolPerLiter(180f, 23.201f),
+        FromMolPerLiter(180f, 24.481f),
+        FromMolPerLiter(180f, 26.340f),
+        FromMolPerLiter(180f, 27.706f),
+        FromMolPerLiter(180f, 28.796f),
+        FromMolPerLiter(180f, 30.500f),
+        FromMolPerLiter(180f, 31.825f),
+        FromMolPerLiter(300f, 0.040115f),
+        FromMolPerLiter(300f, 0.37593f),
+        FromMolPerLiter(300f, 0.78315f),
+        FromMolPerLiter(300f, 2.0294f),
+        FromMolPerLiter(300f, 4.1626f),
+        FromMolPerLiter(300f, 6.3038f),
+        FromMolPerLiter(300f, 8.4391f),
+        FromMolPerLiter(300f, 10.361f),
+        FromMolPerLiter(300f, 12.103f),
+        FromMolPerLiter(300f, 15.038f),
+        FromMolPerLiter(300f, 17.352f),
+        FromMolPerLiter(300f, 19.212f),
+        FromMolPerLiter(300f, 22.045f),
+        FromMolPerLiter(300f, 24.152f),
+    ];
+
+    // NIST Chemistry WebBook, isotermer for krypton: ../NIST/krypton 180K.csv og krypton 300K.csv
+    private static readonly Condition[] KryptonConditions =
+    [
+        FromMolPerLiter(180f, 0.067455f),
+        FromMolPerLiter(180f, 0.68841f),
+        FromMolPerLiter(180f, 1.6632f),
+        FromMolPerLiter(180f, 22.631f),
+        FromMolPerLiter(180f, 23.473f),
+        FromMolPerLiter(180f, 24.121f),
+        FromMolPerLiter(180f, 24.674f),
+        FromMolPerLiter(180f, 25.132f),
+        FromMolPerLiter(180f, 25.538f),
+        FromMolPerLiter(180f, 26.233f),
+        FromMolPerLiter(180f, 26.821f),
+        FromMolPerLiter(180f, 27.333f),
+        FromMolPerLiter(180f, 28.200f),
+        FromMolPerLiter(180f, 28.922f),
+        FromMolPerLiter(300f, 0.040171f),
+        FromMolPerLiter(300f, 0.38097f),
+        FromMolPerLiter(300f, 0.80555f),
+        FromMolPerLiter(300f, 2.1915f),
+        FromMolPerLiter(300f, 4.9125f),
+        FromMolPerLiter(300f, 8.0010f),
+        FromMolPerLiter(300f, 10.974f),
+        FromMolPerLiter(300f, 13.217f),
+        FromMolPerLiter(300f, 14.898f),
+        FromMolPerLiter(300f, 17.235f),
+        FromMolPerLiter(300f, 18.840f),
+        FromMolPerLiter(300f, 20.056f),
+        FromMolPerLiter(300f, 21.859f),
+        FromMolPerLiter(300f, 23.193f),
     ];
 
     public static void NistVaporExperiment()
     {
         var measurementSettings = new MeasurementSettings
         {
-            StepToMeasureAt = 500000,
-            StepsToAverageOver = 500000
+            StepToMeasureAt = 50000,
+            StepsToAverageOver = 100000,
+            StepsBetweenMeasurements = 10
         };
-        RunNistComparison(NistVaporReferences, measurementSettings, 0.003f, "nist_vapor_experiment.csv");
+        RunAtConditions(NistVaporConditions, ParticleParameters.Argon, measurementSettings, "nist_vapor_experiment.csv");
     }
 
-    public static void NistLiquidExperiment()
+    public static void NobleGasIsothermExperiment()
     {
         var measurementSettings = new MeasurementSettings
         {
             StepToMeasureAt = 50000,
-            StepsToAverageOver = 50000
+            StepsToAverageOver = 50000,
+            StepsBetweenMeasurements = 10
         };
-        RunNistComparison(NistLiquidReferences, measurementSettings, 0.002f, "nist_liquid_experiment.csv");
+        RunAtConditions(HeliumConditions, ParticleParameters.Helium, measurementSettings, "helium_isotherm_experiment.csv");
+        RunAtConditions(NeonConditions, ParticleParameters.Neon, measurementSettings, "neon_isotherm_experiment.csv");
+        RunAtConditions(ArgonConditions, ParticleParameters.Argon, measurementSettings, "argon_isotherm_experiment.csv");
+        RunAtConditions(KryptonConditions, ParticleParameters.Krypton, measurementSettings, "krypton_isotherm_experiment.csv");
     }
 
-    private readonly record struct ArgonReference(float Temperature, float Pressure, float Density);
-
-    // NIST Chemistry WebBook, isotermer for argon (Temperature K, Pressure bar, Density mol/l): ../NIST/argon 180K.csv og argon 300K.csv
-    private static readonly ArgonReference[] ArgonReferences =
-    [
-        new(180f, 1.0000f, 0.067088f),
-        new(180f, 49.285f, 4.2262f),
-        new(180f, 99.235f, 12.172f),
-        new(180f, 149.19f, 18.503f),
-        new(180f, 199.13f, 21.378f),
-        new(180f, 249.09f, 23.152f),
-        new(180f, 300.70f, 24.481f),
-        new(180f, 400.60f, 26.340f),
-        new(180f, 500.50f, 27.706f),
-        new(180f, 600.40f, 28.796f),
-        new(180f, 800.20f, 30.500f),
-        new(180f, 1000.0f, 31.825f),
-        new(300f, 1.0000f, 0.040115f),
-        new(300f, 49.285f, 2.0294f),
-        new(300f, 99.235f, 4.1626f),
-        new(300f, 149.19f, 6.3038f),
-        new(300f, 199.13f, 8.3722f),
-        new(300f, 249.09f, 10.300f),
-        new(300f, 300.70f, 12.103f),
-        new(300f, 400.60f, 15.038f),
-        new(300f, 500.50f, 17.352f),
-        new(300f, 600.40f, 19.212f),
-        new(300f, 800.20f, 22.045f),
-        new(300f, 1000.0f, 24.152f),
-    ];
-
-    public static void ArgonIsothermExperiment()
+    // Argon ved 180 K med længere gennemsnit og skarpere temperatur, fordi den havde meget store udsving i tryk.
+    public static void Argon180Experiment()
     {
-        const int particleCount = 1000;
-        const int maxAttempts = 5;
-        const float temperatureTolerance = 1f; // K
-        const double avogadroConstant = 6.02214076e23;
-
-        var particleParameters = ParticleParameters.Argon;
         var measurementSettings = new MeasurementSettings
         {
             StepToMeasureAt = 50000,
-            StepsToAverageOver = 100000
+            StepsToAverageOver = 200000,
+            StepsBetweenMeasurements = 10,
+            TemperatureTolerance = 0.25f,
+            TemperatureSearchStepsToAverageOver = 20000
         };
-
-        var lines = new string[ArgonReferences.Length];
-
-        Parallel.For(0, ArgonReferences.Length, i =>
-        {
-            var reference = ArgonReferences[i];
-
-            // mol/l -> partikler pr. Å³
-            float numberDensity = (float)(reference.Density * 1000 * avogadroConstant * Math.Pow(Units.MeterPerAngstrom, 3));
-            float boxSide = MathF.Cbrt(particleCount / numberDensity);
-
-            float startTemperature = reference.Temperature;
-            for (int attempt = 1; ; attempt++)
-            {
-                float startVelocity = MathF.Sqrt(3f * (float)Units.BoltzmannConstant * startTemperature / particleParameters.Mass);
-                var simulationParameters = new SimulationParameters(particleCount, new Vector3(boxSide), startVelocity);
-
-                var measurement = Experimenter.RunExperiment(simulationParameters, particleParameters, measurementSettings);
-
-                float pressure = (float)(measurement.Pressure * Units.PascalPerPressureUnit / 1e5); // bar
-                float temperatureError = measurement.Temperature - reference.Temperature;
-
-                Console.WriteLine($"T = {reference.Temperature} K, NIST p = {reference.Pressure} bar, forsøg {attempt}: målt T = {measurement.Temperature:F2} K, p = {pressure:G5} bar");
-
-                if (MathF.Abs(temperatureError) > temperatureTolerance && attempt < maxAttempts)
-                {
-                    startTemperature -= temperatureError;
-                    continue;
-                }
-
-                // Z = p / (n k T), hvor n er antal partikler pr. volumen
-                float idealPressure = (float)(numberDensity * Units.BoltzmannConstant * measurement.Temperature * Units.PascalPerPressureUnit / 1e5);
-                float nistIdealPressure = (float)(numberDensity * Units.BoltzmannConstant * reference.Temperature * Units.PascalPerPressureUnit / 1e5);
-
-                lines[i] = string.Join(';', new float[]
-                {
-                    reference.Temperature, reference.Density, numberDensity * MathF.Pow(particleParameters.Sigma, 3), boxSide, attempt,
-                    measurement.Temperature, pressure, reference.Pressure,
-                    pressure / idealPressure, reference.Pressure / nistIdealPressure,
-                    (pressure - reference.Pressure) / reference.Pressure,
-                }.Select(v => v.ToString(CultureInfo.InvariantCulture)));
-                break;
-            }
-        });
-
-        const string header = "TargetT;DensityMolPerL;ReducedDensity;BoxSideAngstrom;Attempts;T;P;NistP;Z;NistZ;PRelativeDeviation";
-        const string path = "argon_isotherm_experiment.csv";
-
-        File.WriteAllLines(path, lines.Prepend(header));
-        Console.WriteLine($"Resultater gemt i {Path.GetFullPath(path)}");
+        var conditions = ArgonConditions.Where(c => c.Temperature == 180f).ToArray();
+        RunAtConditions(conditions, ParticleParameters.Argon, measurementSettings, "argon_180K_precise_experiment.csv");
     }
 
-    private static void RunNistComparison(NistReference[] references, MeasurementSettings measurementSettings, float temperatureTolerance, string path)
+    private static void RunAtConditions(Condition[] conditions, ParticleParameters particleParameters, MeasurementSettings measurementSettings, string path)
     {
         const int particleCount = 1000;
-        const int maxAttempts = 4;
 
-        var particleParameters = ParticleParameters.Argon;
+        var simulationParameters = new SimulationParameters(particleCount, Vector3.Zero, 0f);
 
-        var lines = new string[references.Length];
+        // Ved samme temperatur har atomerne samme kinetiske energi, så lette atomer bevæger sig hurtigere (v ~ 1/√m).
+        // Tidssteppet gøres mindre, så de flytter sig lige så langt pr. step som argon med 0,005 ps.
+        simulationParameters.TimePerStepPs = MathF.Min(0.005f, 0.005f * MathF.Sqrt(particleParameters.Mass / ParticleParameters.Argon.Mass));
 
-        Parallel.For(0, references.Length, i =>
-        {
-            var reference = references[i];
-            float boxSide = MathF.Cbrt(particleCount / reference.Density) * particleParameters.Sigma;
-            var latticeParameters = new SimulationParameters(particleCount, new Vector3(boxSide), 0f);
-
-            // Energibevarelse fra startgitteret: (3/2)T*₀ + U*₀ = (3/2)T* + U*
-            float latticePotentialEnergy = new ParticleSimulation3D(latticeParameters, particleParameters).GetCorrectedPotentialEnergy() / (particleCount * particleParameters.Epsilon);
-            float startTemperature = reference.Temperature + 2f / 3f * (reference.PotentialEnergy - latticePotentialEnergy);
-
-            for (int attempt = 1; ; attempt++)
+        var measurements = Experimenter.RunExperiments(
+            simulationParameters,
+            particleParameters,
+            measurementSettings,
+            (sp, pp, ms, i) =>
             {
-                float startVelocity = MathF.Sqrt(3f * startTemperature * particleParameters.Epsilon / particleParameters.Mass);
-                var simulationParameters = latticeParameters with { ParticleStartVelocity = startVelocity };
+                sp.BoxSize = new Vector3(MathF.Cbrt(particleCount / conditions[i].NumberDensity));
+                ms.TargetTemperature = conditions[i].Temperature;
+                Console.WriteLine($"{path}: kører forsøg {i + 1}/{conditions.Length} (T = {conditions[i].Temperature} K, V = {sp.BoxSize.X * sp.BoxSize.Y * sp.BoxSize.Z:G5} Å³)...");
+                return (sp, pp, ms);
+            },
+            conditions.Length,
+            Environment.ProcessorCount);
 
-                var measurement = Experimenter.RunExperiment(simulationParameters, particleParameters, measurementSettings);
+        var lines = new List<string> { "TargetTemperature;" + Measurement.CsvHeader };
+        for (int i = 0; i < measurements.Length; i++)
+        {
+            Console.WriteLine($"T = {conditions[i].Temperature} K: {measurements[i]}");
+            lines.Add(conditions[i].Temperature.ToString(CultureInfo.InvariantCulture) + ";" + measurements[i].ToCsvLine());
+        }
 
-                float temperature = measurement.Temperature * (float)Units.BoltzmannConstant / particleParameters.Epsilon;
-                float potentialEnergy = measurement.PotentialEnergy / (particleCount * particleParameters.Epsilon);
-                float pressure = measurement.Pressure * MathF.Pow(particleParameters.Sigma, 3) / particleParameters.Epsilon;
-                float temperatureError = temperature - reference.Temperature;
-
-                Console.WriteLine($"T* = {reference.Temperature}, ρ* = {reference.Density}, forsøg {attempt}: v0 = {startVelocity:F4} Å/ps, målt T* = {temperature:F4}, U* = {potentialEnergy:G5} (NIST {reference.PotentialEnergy:G5}), p* = {pressure:G5} (NIST {reference.Pressure:G5})");
-
-                if (MathF.Abs(temperatureError) > temperatureTolerance && attempt < maxAttempts)
-                {
-                    startTemperature -= temperatureError;
-                    continue;
-                }
-
-                lines[i] = string.Join(';', new float[]
-                {
-                    reference.Temperature, reference.Density, particleCount, boxSide, startVelocity, attempt,
-                    temperature, potentialEnergy, pressure,
-                    reference.PotentialEnergy, reference.Pressure,
-                    potentialEnergy - reference.PotentialEnergy, pressure - reference.Pressure,
-                }.Select(v => v.ToString(CultureInfo.InvariantCulture)));
-                break;
-            }
-        });
-
-        const string header = "TargetT;Density;ParticleCount;BoxSideAngstrom;StartVelocity;Attempts;T;U;P;NistU;NistP;UDeviation;PDeviation";
-
-        File.WriteAllLines(path, lines.Prepend(header));
+        File.WriteAllLines(path, lines);
         Console.WriteLine($"Resultater gemt i {Path.GetFullPath(path)}");
     }
 }

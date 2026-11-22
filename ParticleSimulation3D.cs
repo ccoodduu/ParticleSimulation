@@ -12,8 +12,6 @@ class ParticleSimulation3D
     public float BoxVolume => BoxSize.X * BoxSize.Y * BoxSize.Z;
     public float Density => ParticleCount / BoxVolume; // Partikler pr. volumen
 
-    private readonly Random random;
-
     private readonly Particle3D[] particles;
     public IReadOnlyList<Particle3D> Particles => particles;
 
@@ -31,7 +29,7 @@ class ParticleSimulation3D
     private float LennardJonesCutoff => LennardJones.GetCutoffDistance(ParticleParameters.Sigma, SimulationParameters.LennardJonesCutoffMultiplier);
     public ParticleSimulation3D(SimulationParameters simulationParameters, ParticleParameters particleParameters)
     {
-        random = new Random();
+        var random = new Random();
 
         SimulationParameters = simulationParameters;
         ParticleParameters = particleParameters;
@@ -276,7 +274,7 @@ class ParticleSimulation3D
         float virial = 0f;
         ForEachNeighborPair((i, j, difference, d2) =>
         {
-            var force = LennardJones.CalculateForce(difference, sigma2, ParticleParameters.Epsilon);
+            var force = LennardJones.CalculateForce(difference, d2, sigma2, ParticleParameters.Epsilon);
             particles[i].ApplyForce(force, ParticleParameters.Mass);
             particles[j].ApplyForce(-force, ParticleParameters.Mass);
             virial += Vector3.Dot(difference, force);

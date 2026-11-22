@@ -2,11 +2,8 @@ using ParticleSimulation;
 using Raylib_cs;
 using System.Numerics;
 
-if (args.Contains("--nist-liquid"))
-{
-    Experiments.NistLiquidExperiment();
-    return;
-}
+// Hvis programmet startes med et af de følgende argumenter, kører det i eksperimenttilstand og afslutter derefter.
+// Ellers kører det i normal tilstand med grafisk visning af simulationen.
 
 if (args.Contains("--nist-vapor"))
 {
@@ -14,15 +11,15 @@ if (args.Contains("--nist-vapor"))
     return;
 }
 
-if (args.Contains("--argon"))
+if (args.Contains("--noble-gases"))
 {
-    Experiments.ArgonIsothermExperiment();
+    Experiments.NobleGasIsothermExperiment();
     return;
 }
 
-if (args.Contains("--experiment"))
+if (args.Contains("--argon-180"))
 {
-    Experiments.StartVelocityExperiment();
+    Experiments.Argon180Experiment();
     return;
 }
 
@@ -30,7 +27,7 @@ Raylib.SetConfigFlags(ConfigFlags.ResizableWindow);
 Raylib.InitWindow(Globals.ScreenWidth, Globals.ScreenHeight, "Particle Simulation");
 Raylib.SetTargetFPS(Globals.Fps);
 
-var simulationParameters = new SimulationParameters(1000, new Vector3(100), 3.5f);
+var simulationParameters = new SimulationParameters(1000, new Vector3(70), 3.0f);
 
 var particleSimulation = new ParticleSimulation3D(simulationParameters, ParticleParameters.Argon);
 var renderer = new Renderer3D(particleSimulation);
@@ -116,7 +113,6 @@ namespace ParticleSimulation
         public const int Fps = 60;
         public const int Sps = 1000;
 
-        public const float RealFrameTime = 1f / Fps;
         public const float RealStepTime = 1f / Sps;
     }
 }

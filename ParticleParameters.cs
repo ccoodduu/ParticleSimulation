@@ -15,21 +15,26 @@ public struct ParticleParameters
         Epsilon = 1f;
     }
 
-    public static ParticleParameters Default => new();
+    // Masserne er IUPAC's standard-atommasser.
+    // Kilderne angiver epsilon som ε/k i kelvin, så den ganges med Boltzmanns konstant for at få simuleringens energienhed.
 
-    // TODO: Skriv kilde på disse værdier.
-    public static ParticleParameters Xenon => new()
+    // Svehla, R. A. (1962). Estimated viscosities and thermal conductivities of gases at high temperatures. NASA Technical Report R-132, tabel I.
+    public static ParticleParameters Helium => Create(4.0026f, 2.551f, 10.22f);
+
+    // Rutkai, G., Thol, M., Span, R. & Vrabec, J. (2017). How well does the Lennard-Jones potential represent the thermodynamic properties of noble gases?
+    // Molecular Physics 115, 1104-1121, tabel 1 (LJ). https://doi.org/10.1080/00268976.2016.1246760
+    public static ParticleParameters Neon => Create(20.180f, 2.801f, 33.921f);
+    public static ParticleParameters Argon => Create(39.948f, 3.3952f, 116.79f);
+    public static ParticleParameters Krypton => Create(83.798f, 3.6274f, 162.58f);
+
+    private static ParticleParameters Create(float mass, float sigma, float epsilonOverBoltzmann)
     {
-        Radius = 4.10f / 2f,
-        Mass = 131.29f,
-        Sigma = 4.10f,
-        Epsilon = 177f
-    };
-    public static ParticleParameters Argon => new()
-    {
-        Radius = 3.405f / 2f,
-        Mass = 39.948f,
-        Sigma = 3.405f,
-        Epsilon = 99.6f
-    };
+        return new ParticleParameters
+        {
+            Radius = sigma / 2f,
+            Mass = mass,
+            Sigma = sigma,
+            Epsilon = epsilonOverBoltzmann * (float)Units.BoltzmannConstant
+        };
+    }
 }

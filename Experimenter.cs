@@ -37,7 +37,8 @@ public struct Measurement
         };
     }
 
-    public const string CsvHeader = "KineticEnergy;PotentialEnergy;Pressure;Temperature;Volume;ParticleCount";
+    // CSV-filen er i SI-enheder
+    public const string CsvHeader = "KineticEnergy (J);PotentialEnergy (J);Pressure (Pa);Temperature (K);Volume (m^3);ParticleCount";
 
     public override string ToString()
     {
@@ -49,11 +50,11 @@ public struct Measurement
     public string ToCsvLine()
     {
         return String.Join(';',
-            KineticEnergy.ToString(CultureInfo.InvariantCulture),
-            PotentialEnergy.ToString(CultureInfo.InvariantCulture),
-            Pressure.ToString(CultureInfo.InvariantCulture),
+            (KineticEnergy * Units.JoulePerEnergyUnit).ToString(CultureInfo.InvariantCulture),
+            (PotentialEnergy * Units.JoulePerEnergyUnit).ToString(CultureInfo.InvariantCulture),
+            (Pressure * Units.PascalPerPressureUnit).ToString(CultureInfo.InvariantCulture),
             Temperature.ToString(CultureInfo.InvariantCulture),
-            Volume.ToString(CultureInfo.InvariantCulture),
+            (Volume * Math.Pow(Units.MeterPerAngstrom, 3)).ToString(CultureInfo.InvariantCulture),
             ParticleCount.ToString(CultureInfo.InvariantCulture));
     }
 }
@@ -62,27 +63,38 @@ public struct MeasurementSettings
 {
     public int StepToMeasureAt;
     public int StepsToAverageOver;
+    public int StepsBetweenMeasurements = 1; // Målingen af den potentielle energi gennemløber alle nabopar en ekstra gang, så det er dyrt at måle i hvert step
+    public float? TargetTemperature = null; // K. Hvis den er sat, findes startfarten automatisk, og ParticleStartVelocity ignoreres
+    public float TemperatureTolerance = 1f; // K. Hvor tæt prøvekørslerne skal ramme TargetTemperature
+    public int TemperatureSearchStepsToAverageOver = 10000; // Hvor mange steps prøvekørslerne måler temperaturen over
+
+    public MeasurementSettings() { }
 }
 
 public static class Experimenter
 {
-    public static Measurement[] RunExperiments(SimulationParameters simulationParameters, ParticleParameters particleParameters, MeasurementSettings measurementSettings, Func<SimulationParameters, ParticleParameters, MeasurementSettings, int, (SimulationParameters, ParticleParameters, MeasurementSettings)> experimentsCreator, int numExperiments)
+    public static Measurement[] RunExperiments(SimulationParameters simulationParameters, ParticleParameters particleParameters, MeasurementSettings measurementSettings, Func<SimulationParameters, ParticleParameters, MeasurementSettings, int, (SimulationParameters, ParticleParameters, MeasurementSettings)> experimentsCreator, int numExperiments, int maxThreads)
     {
         Measurement[] measurements = new Measurement[numExperiments];
 
-        for (int i = 0; i < numExperiments; i++)
+        Parallel.For(0, numExperiments, new ParallelOptions { MaxDegreeOfParallelism = maxThreads }, i =>
         {
             var (sp, pp, ms) = experimentsCreator(simulationParameters, particleParameters, measurementSettings, i);
 
             var measurement = RunExperiment(sp, pp, ms);
             measurements[i] = measurement;
-        }
+        });
 
         return measurements;
     }
 
     public static Measurement RunExperiment(SimulationParameters simulationParameters, ParticleParameters particleParameters, MeasurementSettings measurementSettings)
     {
+        if (measurementSettings.TargetTemperature is float targetTemperature)
+        {
+            simulationParameters.ParticleStartVelocity = FindStartVelocity(simulationParameters, particleParameters, targetTemperature, measurementSettings);
+        }
+
         ParticleSimulation3D simulation = new(simulationParameters, particleParameters);
 
         for (int i = 0; i < measurementSettings.StepToMeasureAt; i++)
@@ -91,18 +103,58 @@ public static class Experimenter
         }
 
         Measurement measurementTotal = new Measurement();
+        int measurementCount = 0;
 
         for (int i = 0; i < measurementSettings.StepsToAverageOver; i++)
         {
-            var measurement = simulation.TakeMeasurement();
-            measurementTotal = measurementTotal.Add(measurement);
+            if (i % measurementSettings.StepsBetweenMeasurements == 0)
+            {
+                var measurement = simulation.TakeMeasurement();
+                measurementTotal = measurementTotal.Add(measurement);
+                measurementCount++;
+            }
 
             simulation.Update();
         }
 
-        Measurement averageMeasurement = measurementTotal.Divide(measurementSettings.StepsToAverageOver);
+        Measurement averageMeasurement = measurementTotal.Divide(measurementCount);
 
         return averageMeasurement;
+    }
+
+    // Simuleringen bevarer energien, så temperaturen kan ikke vælges direkte. Den afhænger af startfarten og af den potentielle energi,
+    // der frigives, når startgitteret går i opløsning. Derfor findes startfarten med korte prøvekørsler, før den lange måling køres.
+    private static float FindStartVelocity(SimulationParameters simulationParameters, ParticleParameters particleParameters, float targetTemperature, MeasurementSettings measurementSettings)
+    {
+        const int maxAttempts = 10;
+        float temperatureTolerance = measurementSettings.TemperatureTolerance;
+        var searchSettings = new MeasurementSettings
+        {
+            StepToMeasureAt = 20000,
+            StepsToAverageOver = measurementSettings.TemperatureSearchStepsToAverageOver,
+            StepsBetweenMeasurements = 10
+        };
+
+        float startTemperature = targetTemperature;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            simulationParameters.ParticleStartVelocity = GetStartVelocity(startTemperature, particleParameters.Mass);
+
+            float temperatureError = RunExperiment(simulationParameters, particleParameters, searchSettings).Temperature - targetTemperature;
+            if (MathF.Abs(temperatureError) <= temperatureTolerance) break;
+
+            // Blev det for varmt, startes næste forsøg lige så meget koldere
+            startTemperature -= temperatureError;
+        }
+
+        return simulationParameters.ParticleStartVelocity;
+    }
+
+    // Udregn farten for en partikel med en given temperatur og masse, det er bare temperatur-udregningen omvendt.
+    // Bruges til at komme med et bud på startfarten, når der ønskes en bestemt temperatur. 
+    private static float GetStartVelocity(float temperature, float mass)
+    {
+        return MathF.Sqrt(3f * (float)Units.BoltzmannConstant * temperature / mass);
     }
 
     private static Measurement TakeMeasurement(this ParticleSimulation3D simulation)

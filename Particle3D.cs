@@ -2,12 +2,17 @@ using System.Numerics;
 
 namespace ParticleSimulation;
 
-struct Particle3D(Vector3 position, Vector3 velocity)
+struct Particle3D
 {
-    public Vector3 Position { get; private set; } = position;
-    public Vector3 Velocity { get; private set; } = velocity;
-
+    public Vector3 Position { get; private set; }
+    public Vector3 Velocity { get; private set; }
     public Vector3 Acceleration { get; private set; } = Vector3.Zero;
+
+    public Particle3D(Vector3 position, Vector3 velocity)
+    {
+        Position = position;
+        Velocity = velocity;
+    }
 
     public void ApplyForce(Vector3 force, float mass)
     {

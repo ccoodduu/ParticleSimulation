@@ -18,4 +18,6 @@ public static class Units
     public const double JoulePerEnergyUnit = (KgPerUnit * MeterPerAngstrom * MeterPerAngstrom) / (SecondsPerPs * SecondsPerPs);
 
     public const double BoltzmannConstant = 1.380649e-23 / JoulePerEnergyUnit;
+
+    public const double AvogadroConstant = 6.02214076e23;
 }

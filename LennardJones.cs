@@ -16,10 +16,15 @@ static class LennardJones
     {
         return CalculateForce(p1 - p2, sigma2, epsilon);
     }
+
     public static Vector3 CalculateForce(Vector3 difference, float sigma2, float epsilon)
     {
-        float distance2 = difference.LengthSquared(); // Beregn afstanden i anden mellem de to partikler (r^2). Afstanden kaldes ofte r i formlen for Lennard-Jones potentialet.
+        float distance2 = difference.LengthSquared(); // Beregn afstanden i anden mellem de to partikler (r^2). 
+        return CalculateForce(difference, distance2, sigma2, epsilon);
+    }
 
+    public static Vector3 CalculateForce(Vector3 difference, float distance2, float sigma2, float epsilon)
+    {
         float sigmaOverR2 = sigma2 / distance2;
 
         float sigmaOverR6 = sigmaOverR2 * sigmaOverR2 * sigmaOverR2;
@@ -31,10 +36,10 @@ static class LennardJones
     }
 
     // Beregn den potentielle energi mellem to partikler ved hjælp af Lennard-Jones potentialet
-    // Formlen for Lennard-Jones potentialet er: U(r) = 4 * epsilon * ((sigma / r)^12 - (sigma / r)^6)
+    // Formlen for Lennard-Jones potentialet er: E_pot(r) = 4 * epsilon * ((sigma / r)^12 - (sigma / r)^6)
     public static float CalculatePotentialEnergy(Vector3 p1, Vector3 p2, float sigma2, float epsilon)
     {
-        float distance2 = Vector3.DistanceSquared(p1, p2); // Beregn afstanden i anden mellem de to partikler (r^2). Afstanden kaldes ofte r i formlen for Lennard-Jones potentialet. 
+        float distance2 = Vector3.DistanceSquared(p1, p2); // Beregn afstanden i anden mellem de to partikler (r^2). 
 
         return CalculatePotentialEnergy(distance2, sigma2, epsilon);
     }
@@ -61,7 +66,7 @@ static class LennardJones
     }
     public static float CalculatePotentialEnergyWithCutoff(Vector3 p1, Vector3 p2, float sigma2, float epsilon, float cutoff2, float offset)
     {
-        float distance2 = Vector3.DistanceSquared(p1, p2); // Beregn afstanden i anden mellem de to partikler (r^2). Afstanden kaldes ofte r i formlen for Lennard-Jones potentialet.
+        float distance2 = Vector3.DistanceSquared(p1, p2); // Beregn afstanden i anden mellem de to partikler (r^2). 
 
         return CalculatePotentialEnergyWithCutoff(distance2, sigma2, epsilon, cutoff2, offset);
     }
