@@ -173,7 +173,7 @@ public static class Experiments
         var measurementSettings = new MeasurementSettings
         {
             StepToMeasureAt = 50000,
-            StepsToAverageOver = 100000,
+            StepsToAverageOver = 2000000,
             StepsBetweenMeasurements = 10
         };
         RunAtConditions(NistVaporConditions, ParticleParameters.Argon, measurementSettings, "nist_vapor_experiment.csv");
